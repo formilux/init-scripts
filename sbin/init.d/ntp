@@ -26,8 +26,8 @@ function fct_pre_start {
     local driftfile
 
     valueof $opt_config driftfile > /dev/null 2>&1 ; driftfile=$REPLY
-    if [ ! -e $( dirname $driftfile ) ] ; then
-      mkdir -p $(dirname $driftfile)
+    if [ -n "$driftfile" -a ! -e "${driftfile%/*}" ] ; then
+        mkdir -p ${driftfile%/*}
     fi
     if [ "$opt_force_sync" = "1" -a "$opt_sync_servers" ]; then
 	ntpdate -u -t 2 $opt_sync_servers
@@ -53,3 +53,4 @@ function do_update {
 }
 
 load_config
+

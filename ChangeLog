@@ -1,3 +1,7 @@
+2003/06/12
+- correction de la lecture du pid dans functions
+- valueof ne fait le grep que si le fichier existe
+- correctifs sur le script ntp
 2003/06/05
 - petits correctifs et quelques mises à jour
 - plusieurs scripts comprennent dorénavant l'option nice

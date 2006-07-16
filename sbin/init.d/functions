@@ -98,7 +98,11 @@ function logit {
 
 # usage: valueof CONFIGFILE PARAMETER
 function valueof {
-    REPLY=$(grep $'^[ \t]*'"$2"'[:= \t]*' $1|sed s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,')
+    if [ -e "$1" ]; then
+        REPLY=$(grep $'^[ \t]*'"$2"'[:= \t]*' $1|sed s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,')
+    else
+        REPLY=
+    fi
     echo $REPLY
 }
 
@@ -162,7 +166,7 @@ function remount_rw {
       return 1
    fi
    echo -n "    - remounting $root read-write ..."
-   if mount -wo remount $root >/dev/null 2>&1; then
+   if remountw $root >/dev/null 2>&1; then
 	echo "    => done."
 	return 0
    else
@@ -187,7 +191,7 @@ function remount_ro {
       return 1
    fi
    echo -n "    - remounting $root read-only ..."
-   if mount -ro remount $root >/dev/null 2>&1; then
+   if remountr $root >/dev/null 2>&1; then
 	echo "    => done."
 	return 0
    else
@@ -391,7 +395,7 @@ function do_stop_with_pidfile {
     svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
     
     if [ $FORCE_START_STOP -eq 0 ]; then
-	if ! [ -r "$pidfile" ] || ! read pid REPLY <"$pidfile" || ! [ -L /proc/$pid/cwd ]; then
+	if ! [ -r "$pidfile" ] || { read pid REPLY <"$pidfile"; [ -z "$pid" ]; } || ! [ -L /proc/$pid/cwd ]; then
 	    echo "# Process $pname${instname:+[$instname]} already stopped (according to $pidfile)${pids:+, but check pids : $pids}"
 	    # ensure that we remove stale files
 	    [ -e "$pidfile" ] && echo "Removing stale pid file" && rm -f "$pidfile"
