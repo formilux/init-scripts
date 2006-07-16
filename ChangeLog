@@ -1,5 +1,6 @@
 2003/06/17
 - déplacement de /sbin/init.d/syslog-ng vers le package syslog-ng
+- création de /var/log en root:log:2750
 2003/06/16
 - ajout de la fonction 'daemon' qui permet de lancer un processus
   détaché de ses file-descripteurs, du tty et du process père.
