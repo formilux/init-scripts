@@ -6,9 +6,9 @@ export PATH=/sbin:/bin:/usr/sbin:/usr/bin
 # enable swapping
 /sbin/swapon -a
 
-# initialize LCD
-if [ ! -x /bin/lcdwrite ] ; then alias lcdwrite=/bin/true ; fi 
-if [ ! -x /bin/lcdtee ] ; then alias lcdtee=/bin/cat ; fi 
+# initialize LCD if present
+if [ ! -x /bin/lcdwrite ] ; then function lcdwrite { /bin/true; } ; fi
+if [ ! -x /bin/lcdtee ] ; then function lcdtee { /bin/cat; } ; fi
 echo | lcdwrite 
 
 if [ ! -e /proc/mounts ] ; then

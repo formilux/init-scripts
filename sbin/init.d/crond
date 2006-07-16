@@ -1,9 +1,11 @@
 #!/bin/bash
 
+# warning : crond is buggy, it doesn't close its fd's before forking !
+
 . `dirname $0`/functions
 
 option	bin		reserved_option	/usr/sbin/crond
-option	cmdline		reserved_option	'$bin'
+option	cmdline		reserved_option	'daemon $bin'
 
 pidfile=/var/run/cron.pid
 crontab=/etc/crontab

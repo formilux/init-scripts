@@ -146,6 +146,14 @@ function svc_pidof {
     REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
 }
 
+# This function starts the given process in background, in a new session,
+# and with all its I/O closed, to ensure that it will not block a TTY if
+# a lazy coder didn't think appropriate to close the file descriptors
+# before forking.
+function daemon {
+    setsid "$@" <&- 1<&- 2<&-  &
+}
+
 ######################
 # EXPORTED FUNCTIONS #
 ######################

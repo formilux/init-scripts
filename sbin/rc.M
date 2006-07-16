@@ -1,7 +1,7 @@
 #!/bin/sh
 
-if [ ! -x /bin/lcdwrite ] ; then alias lcdwrite=/bin/true ; fi 
-if [ ! -x /bin/lcdtee ] ; then alias lcdtee=/bin/cat ; fi 
+if [ ! -x /bin/lcdwrite ] ; then function lcdwrite { /bin/true; } ; fi 
+if [ ! -x /bin/lcdtee ] ; then function lcdtee { /bin/cat; } ; fi 
 
 LOG=/var/log/bootlog
 

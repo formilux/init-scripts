@@ -1,3 +1,9 @@
+2003/06/16
+- ajout de la fonction 'daemon' qui permet de lancer un processus
+  détaché de ses file-descripteurs, du tty et du process père.
+- cron utilise désormais daemon sinon une machine démarrant cron ne
+  peut pas finir de s'initialiser car il ne ferme pas ses fd avant le
+  fork !
 2003/06/12
 - correction de la lecture du pid dans functions
 - valueof ne fait le grep que si le fichier existe
