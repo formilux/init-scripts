@@ -181,6 +181,20 @@ function do_start {
 	arg=$[$arg+1]
     done
 
+    # a dot in an interface name means physical_if.vlanid
+    # We have to create the interface now.
+    if [ -z "${instname//*.*/}" ]; then
+	arg=${instname%%.*}
+	if ! do_status $svcname $arg && ! do_start $svcname $arg >/dev/null 2>&1; then
+	    echo "  ==> FAILED! could not start slave $arg before $instname"
+	fi
+	vconfig add $arg ${instname#*.} >/dev/null
+	if [ $? -gt 0 ]; then
+	    echo "  ==> start $svcname${instname:+[$instname]} : Failed."
+	    return 1
+	fi
+    fi
+
     ip addr flush dev $instname >/dev/null 2>&1
     ip link set $instname down >/dev/null 2>&1
 
@@ -220,8 +234,8 @@ function do_start {
 
     if [ ${#opt_slave[*]} -gt 0 ]; then
 	for arg in ${opt_slave[*]}; do
-	    if ! $PFULLNAME status $arg >/dev/null 2>&1; then
-		echo "  ==> FAILED! need to start slave $arg before $instname"
+	    if ! do_status $svcname $arg && ! do_start $svcname $arg >/dev/null 2>&1; then
+		    echo "  ==> FAILED! need to start slave $arg before $instname"
 	    else
 		ifenslave $instname $arg >/dev/null 2>&1
 		ip addr flush dev $arg >/dev/null 2>&1
@@ -307,8 +321,11 @@ function do_stop {
     echo "# Stopping $svcname${instname:+[$instname]} ..."
 
     if ! do_status $svcname $instname > /dev/null 2>&1; then
-	echo "  ==> stop $svcname${instname:+[$instname]} : already stopped."
-	return 0
+	# vlan interfaces must disappear
+	if [ -n "${instname//*.*/}" ] || ! ip link show $instname >/dev/null 2>&1; then
+	    echo "  ==> stop $svcname${instname:+[$instname]} : already stopped."
+	    return 0
+        fi
     fi
 
     # we may have to kill dhcpcd
@@ -325,6 +342,10 @@ function do_stop {
 
     ip addr flush dev $instname >/dev/null 2>&1
     ip link set $instname down >/dev/null 2>&1
+
+    # a dot in an interface name means physical_if.vlanid
+    # We have to remove the interface now.
+    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null
 
     arg=${#opt_modprobe[*]}
     while [ $arg -gt 0 ]; do
