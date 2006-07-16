@@ -1,3 +1,10 @@
+2006/02/02 : 0.3.35
+- the network script can now set the hostname via DHCP and waits 1 second for
+  the link to set up when needed before the DHCP request.
+2005/10/02
+- the 'daemon' function no longer closes stdin/stdout, but rather redirects them
+  to /dev/null in order to avoid stupid daemons such as cron to pass closed fds
+  to the services they call !
 2004/12/14 : 0.3.34
 - firewall now supports anonymous config files
 2004/05/31 : 0.3.33

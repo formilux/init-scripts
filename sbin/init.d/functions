@@ -148,11 +148,11 @@ function svc_pidof {
 }
 
 # This function starts the given process in background, in a new session,
-# and with all its I/O closed, to ensure that it will not block a TTY if
-# a lazy coder didn't think appropriate to close the file descriptors
-# before forking.
+# and with all its I/O directed to /dev/null, to ensure that it will not
+# block a TTY if a lazy coder didn't think appropriate to close the file
+# descriptors before forking.
 function daemon {
-    setsid "$@" <&- 1<&- 2<&-  &
+    setsid "$@" </dev/null >&0 2>&0 &
 }
 
 ######################

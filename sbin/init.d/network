@@ -32,6 +32,8 @@ fi
 . `dirname $0`/functions
 
 option	ip		option_ip
+option	usedhcphostname	boolean_option	0
+option	dhcptimeout	standard_option	10
 option	media		standard_option
 option	duplex		standard_option
 option	speed		standard_option
@@ -302,7 +304,14 @@ function do_start {
     while [ $arg -lt $addr_idx ]; do
 	if [ "${addr_list[$arg]}" = "dhcp" ]; then
 	    echo "  ==> Waiting for ip address with DHCP request ... "
-	    dhcpcd -t 10 $instname
+	    # on some cards (eg: tg3), we need to wait a bit before
+	    # using the link.
+	    ethtool $instname 2>/dev/null | grep -qF 'Link detected: yes' || sleep 1
+	    if [ "$opt_usedhcphostname" = 0 ]; then
+	        dhcpcd -t ${opt_dhcptimeout:-10} $instname
+	    else
+	        dhcpcd -H -t ${opt_dhcptimeout:-10} $instname
+	    fi
 	    set -- $(ip addr show dev $instname | grep ' inet ')
 	    if [ -n "$2" ]; then
 		echo "      Device $instname has IP address $2"
