@@ -1,3 +1,4 @@
+sbin/init.d
 sbin/init.d/echelogd
 sbin/init.d/functions
 sbin/init.d/keyboard
