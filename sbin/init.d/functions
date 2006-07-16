@@ -329,7 +329,7 @@ function do_stop_with_pidfile {
     
     if [ $FORCE_START_STOP -eq 0 ]; then
 	if ! [ -r "$pidfile" ] || ! read pid REPLY <"$pidfile" || ! [ -L /proc/$pid/cwd ]; then
-	    echo "# Process $pname${instname:+[$instname]} already stopped (according to $pidfile)${pids:+, but check pids :$pids}"
+	    echo "# Process $pname${instname:+[$instname]} already stopped (according to $pidfile)${pids:+, but check pids : $pids}"
 	    return 0
 	fi
     fi
@@ -461,7 +461,7 @@ function do_status_with_pidfile {
     }
     childrenpid $pid > /dev/null
     local cpid=$*
-    echo "Process $pname${instname:+[$instname]} running :$pid ${cpid:+($cpid)}"
+    echo "Process $pname${instname:+[$instname]} running : $pid ${cpid:+($cpid)}"
     REPLY=$pid
     return 0
 }
@@ -481,7 +481,7 @@ function do_status {
     
     # get info from pidof command
     svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
-    [ "$pids" ] && { echo "Process $pname${instname:+[$instname]} running without pidfile:$pids" ; return 0 ; }
+    [ "$pids" ] && { echo "Process $pname${instname:+[$instname]} running without pidfile : $pids" ; return 0 ; }
     echo "Process $pname${instname:+[$instname]} stopped (no pidfile used)."
     return 1
 }
@@ -768,10 +768,12 @@ function load_config {
     fi
 
     if [ "$SVC_FOUND" != 1 -a "$MUST_LIST_SECTIONS" != 1 ]; then
-	echo "Service/instance not found in $CONFIG"
-        [ "x$G_FACILITY" != x ] && \
-           logger -p $G_FACILITY.warn -t "flxi[$$].$PNAME" -- \
-             "unknown[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
+	echo "Service/instance not found in $CONFIG, using default values."
+	service $PNAME ; service ""
+
+        #[ "x$G_FACILITY" != x ] && \
+        #   logger -p $G_FACILITY.warn -t "flxi[$$].$PNAME" -- \
+        #     "unknown[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
 	exit 1
     fi
     return $STATUS_RET

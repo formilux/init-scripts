@@ -1,3 +1,7 @@
+2003/02/09:
+- on peut maintenant lancer des services même si la section n'existe pas dans
+  config.rc
+- sbin/init.d/system utilise désormais /proc pour positionner hostname et domainname.
 2003/01/26: echelog
 - lecture du fichier de configuration de echelog, déduction des sous fichiers
   de configuration et des répertoires de spool

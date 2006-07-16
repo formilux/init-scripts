@@ -24,8 +24,8 @@ function do_start {
    
     if [ "$opt_hostname" ] ; then
 	echo "Setting hostname '$opt_hostname'"
-	hostname $opt_hostname
-	domainname `echo $opt_hostname | cut -f2- -d.`
+	echo ${opt_hostname%%.*} >/proc/sys/kernel/hostname
+	echo ${opt_hostname#*.} >/proc/sys/kernel/domainname
     fi
 
     for arg in ${opt_sysctl[*]}; do
