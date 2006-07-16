@@ -1,3 +1,6 @@
+2004/05/31 : 0.3.33
+- fixed 2 typos introduced in 'network' script in  0.3.32
+- changed keyword '-' to 'connected' to specify local routes in 'network'
 2004/05/30 : 0.3.32
 - added a commented out line with "/sbin/wdd" in 'startup.rc'
 - added full path to /sbin/rmmod in 'functions' (needed by cron)

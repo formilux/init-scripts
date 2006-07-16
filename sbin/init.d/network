@@ -182,10 +182,10 @@ function do_start {
 	    local dest gw
 	    dest=${route_list[$arg]%%[ 	]*}
 	    gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
-	    if [ -n "${gw##-*}" }; then
+	    if [ -n "${gw##connected*}" ]; then
 		ip route add $dest via $gw
 	    else
-		ip route add $dest ${gw#*[- 	]}	# gw is "-"
+		ip route add $dest ${gw#connected}
 	    fi
 	    arg=$[$arg+1]
 	done
@@ -338,10 +338,10 @@ function do_start {
 	local dest gw
 	dest=${route_list[$arg]%%[ 	]*}
 	gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
-	if [ -n "${gw##-*}" }; then
+	if [ -n "${gw##connected*}" ]; then
 	    ip route add $dest dev $instname via $gw
 	else
-	    ip route add $dest dev $instname ${gw#*[- 	]}	# gw is "-"
+	    ip route add $dest dev $instname ${gw#connected}
 	fi
 	arg=$[$arg+1]
     done
