@@ -1,3 +1,10 @@
+2003/10/02 : 0.3.24
+- functions : 'do_restart' now does its best to kill frozen processes and to
+  bypass defuncts. Its goal is now clearly to get the service up at any cost.
+- pdnsd has been rewritten to work around conceptual flaws in this daemon.
+  It is now marked as deprecated since it's available in the latest pdnsd package.
+2003/09/30
+- pdnsd : fixed wrong pidfile ; clear cache if it exists.
 2003/09/15
 - changelog is now in english
 - functions : a bit more verbose about what is done during start/stop

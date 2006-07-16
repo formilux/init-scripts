@@ -3,14 +3,46 @@
 . `dirname $0`/functions
 
 option	config		standard_option	/etc/pdnsd.conf
-option	pidfile		reserved_option	/var/run/syslog-ng.pid
+option	pidfile		reserved_option	/var/run/pdnsd.pid
 
 option	bin		reserved_option	/usr/sbin/pdnsd
 option	cmdline		reserved_option	'$bin -c $opt_config -d -p $pidfile'
 
-# perform a forced synchronisation before starting the daemon
+# reinitialize the cache before starting the daemon
 function fct_pre_start {
-    if [ ! -d /var/cache/pdnsd ] ; then mkdir -p /var/cache/pdnsd ; fi
+    local user="$($bin -c $opt_config --pdnsd-user 2>/dev/null)"
+
+    if [ ! -d /var/cache/pdnsd ]; then
+       rm -f /var/cache/pdnsd >/dev/null 2>&1
+       mkdir -p /var/cache/pdnsd
+    fi
+    
+    # compilation defaults state that default user is "nobody"
+    user="${user:-nobody}"
+    grep -q "^$user:" /etc/passwd || user="nobody"
+
+    # unconditionally rebuild the cache :
+    #  - either it's empty and pdnsd will not start
+    #  - or it's filled, but if damaged, it may crash
+    rm -f /var/cache/pdnsd/pdnsd.cache 2>/dev/null
+    dd if=/dev/zero of=/var/cache/pdnsd/pdnsd.cache bs=4 count=1 >/dev/null 2>&1
+    chown $user:adm /var/cache/pdnsd /var/cache/pdnsd/pdnsd.cache
+    chmod 750 /var/cache/pdnsd
+    chmod 640 /var/cache/pdnsd/pdnsd.cache
+    return 0
+}
+
+# this function ensures that the daemon really dies, even if multiple
+# pids appear while the pidfile only references one.
+function fct_post_stop {
+    local -a pids
+    local pid=$$
+
+    pids=( $(pidof -o $pid pdnsd) )
+    [ ${#pids[@]} -eq 0 ] && return 0
+    kill ${pids[@]} >/dev/null 2>&1
+    kill -9 ${pids[@]} >/dev/null 2>&1
+    return 0
 }
 
 load_config
