@@ -13,7 +13,7 @@
 #     [no] arp
 #     [no] multicast
 #     shutdown
-#     ip route <ip/mask> <gw> [ip args...]
+#     ip route <ip/mask> <-|gw> [ip args...]
 #     vrrp ... (ignored by this script)
 
 # we want ALL instances to stop and restart at once
@@ -44,6 +44,8 @@ option	arp		boolean_option	1
 option	multicast	boolean_option	1
 option	shutdown	boolean_option
 option	vrrp	 	multiple_option
+option	load 		multiple_option
+option	unload 		multiple_option
 
 SVC_VARS="addr_list route_list arp_list addr_idx route_idx arp_idx"
 
@@ -52,13 +54,14 @@ function do_help {
     echo "Usage: ${0##*/} <status|start|stop|flush|reload|help>"
     echo "List of config.rc options (name, type, default value, current value) :"
     echo
-    echo "   - ip addr <address>, arp <ip> <mac>|pub, dhcp, route <dest> <gw> [<args>]"
+    echo "   - ip addr <address>, arp <ip> <mac>|pub, dhcp, route <dest> <-|gw> [<args>]"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx}"
     echo "   - duplex {half|full}"
     echo "   - speed  {10|100|1000}"
     echo "   - auto   {on|off}"
     echo "   - slave  <interface*>"
     echo "   - modprobe <module> <arg*>"
+    echo "   - load|unload <command> <arg*>"
     echo "   - lladdr <mac_addr>"
     echo "   - mtu <mtu> ; arp {on|off} ; multicast {on|off} ; shutdown"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp>"
@@ -156,9 +159,6 @@ function do_start {
 
     if [ -z "$instname" ]; then
 	echo "# Starting $svcname ..."
-	#if [ "$opt_modprobe" != "#" ]; then
-	#    modprobe $opt_modprobe || return 1
-	#fi
 	arg=0
 	while [ $arg -lt ${#opt_modprobe[*]} ]; do
 	    if [ "${opt_modprobe[$arg]}" != "#" ]; then
@@ -169,11 +169,24 @@ function do_start {
 	    arg=$[$arg+1]
 	done
 	arg=0
+	while [ $arg -lt ${#opt_load[*]} ]; do
+	    if [ "${opt_load[$arg]}" != "#" ]; then
+		if ! sh -c "${opt_load[$arg]}"; then
+		    echo "  ==> start $svcname : load ${opt_load[$arg]} failed. Trying anyway."
+		fi
+	    fi
+	    arg=$[$arg+1]
+	done
+	arg=0
 	while [ $arg -lt $route_idx ]; do
 	    local dest gw
 	    dest=${route_list[$arg]%%[ 	]*}
 	    gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
-	    ip route add $dest via $gw
+	    if [ -n "${gw##-*}" }; then
+		ip route add $dest via $gw
+	    else
+		ip route add $dest ${gw#*[- 	]}	# gw is "-"
+	    fi
 	    arg=$[$arg+1]
 	done
 	echo "  ==> start $svcname : Done."
@@ -187,7 +200,7 @@ function do_start {
     echo "# Starting $svcname${instname:+[$instname]} ..."
     # we only check running instances when an interface is defined
     do_status $svcname $instname > /dev/null 2>&1
-    if [ $? = 0  -a $FORCE_START_STOP -eq 0 ] ; then
+    if [ $? = 0 -a "$instname" != "lo" -a $FORCE_START_STOP -eq 0 ] ; then
 	echo "  ==> Service $svcname${instname:+[$instname]} already running.";
 	[ $SVC_AUTO_START -eq 0 ] && echo "  ==> please use '--force' or 'restart' instead or check with 'status'."
 	return 0
@@ -212,7 +225,17 @@ function do_start {
 	fi
 	arg=$[$arg+1]
     done
-
+    arg=0
+    while [ $arg -lt ${#opt_load[*]} ]; do
+        if [ "${opt_load[$arg]}" != "#" ]; then
+	    if ! sh -c "${opt_load[$arg]}"; then
+	        echo "  ==> start $svcname : load ${opt_load[$arg]} failed. Trying anyway."
+	    fi
+        fi
+        arg=$[$arg+1]
+    done
+    arg=0
+	
     # a dot in an interface name means physical_if.vlanid
     # We have to create the interface now.
     if [ -z "${instname//*.*/}" ]; then
@@ -315,7 +338,11 @@ function do_start {
 	local dest gw
 	dest=${route_list[$arg]%%[ 	]*}
 	gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
-	ip route add $dest dev $instname via $gw
+	if [ -n "${gw##-*}" }; then
+	    ip route add $dest dev $instname via $gw
+	else
+	    ip route add $dest dev $instname ${gw#*[- 	]}	# gw is "-"
+	fi
 	arg=$[$arg+1]
     done
     echo "  ==> start $svcname${instname:+[$instname]} : Done."
@@ -352,6 +379,17 @@ function do_stop {
 
     if [ -z "$instname" ]; then
 	echo "# Stopping $svcname ..."
+
+	arg=0
+	while [ $arg -lt ${#opt_unload[*]} ]; do
+	    if [ "${opt_unload[$arg]}" != "#" ]; then
+		if ! sh -c "${opt_unload[$arg]}"; then
+		    echo "  ==> stop $svcname : unload ${opt_unload[$arg]} failed. Trying anyway."
+		fi
+	    fi
+	    arg=$[$arg+1]
+	done
+
 	arg=${#opt_modprobe[*]}
 	while [ $arg -gt 0 ]; do
 	    arg=$[$arg-1]
@@ -392,6 +430,16 @@ function do_stop {
 
     ip link set $instname down >/dev/null 2>&1
     ip addr flush dev $instname >/dev/null 2>&1
+
+    arg=0
+    while [ $arg -lt ${#opt_unload[*]} ]; do
+        if [ "${opt_unload[$arg]}" != "#" ]; then
+	    if ! sh -c "${opt_unload[$arg]}"; then
+	        echo "  ==> stop $svcname : unload ${opt_unload[$arg]} failed. Trying anyway."
+	    fi
+        fi
+        arg=$[$arg+1]
+    done
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.

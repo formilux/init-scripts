@@ -1,3 +1,4 @@
 #!/bin/sh
 
 /sbin/init.d/sysprofiles /etc/config.rc
+#/sbin/wdd

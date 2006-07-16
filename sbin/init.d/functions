@@ -228,7 +228,7 @@ function recursive_rmmod {
 		(( mod++ ))
 	    done
 	elif [ "${args[2]}" = "0" ]; then
-	    rmmod $1
+	    /sbin/rmmod $1
 	    return $?
 	else
 	    # impossible to remove this module (count>0)
