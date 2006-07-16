@@ -1,3 +1,7 @@
+2004/03/11 : 0.3.31
+- fixed a load error in the firewall script with forwarding disabled
+- fixed an infinite loop bug in recursive_rmmod()
+- added quick workaround for echelogd which does not close its FDs.
 2004/02/01 : 0.3.30
 - squid has been removed
 - etc/init.d points to ../sbin/init.d

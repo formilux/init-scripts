@@ -5,8 +5,13 @@
 option	bin	reserved_option	/opt/echelog/sbin/echelogd
 option  config  standard_option /etc/echelog/echelog.conf
 option  runas   standard_option echelogc:daemon
-option	cmdline	reserved_option	'$bin -C $opt_config'
+option	cmdline	reserved_option	'echelogd_wrapper -C $opt_config'
 #option	check_interval	reserved_option	60
+
+# start echelog daemon with input, output et error redirect to /dev/null
+function echelogd_wrapper {
+    eval "$bin ${cmdline#echelogd_wrapper}" < /dev/null >&0 2>&0
+}
 
 # assign default values to options and variables before parsing the cfg file
 function fct_pre_start {
@@ -177,10 +182,6 @@ function do_install {
         echo "Le certificat généré:"
         cat > $certfile 
     fi   
-}
-
-function do_check {
-    echo "$HOSTNAME $1.$2 $(date +%s) RUNNING 0 OK"
 }
 
 load_config

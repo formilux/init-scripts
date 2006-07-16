@@ -184,6 +184,7 @@ function verbose_load {
 	    echo "OK."
 	    return 0
 	fi
+	return 0
     fi
     echo "FAILED."
     return 1
