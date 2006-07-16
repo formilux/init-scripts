@@ -7,8 +7,6 @@ sbin/init.d/klogd
 sbin/init.d/monitor
 sbin/init.d/mouse
 sbin/init.d/network
-sbin/init.d/ntp
-sbin/init.d/squid
 sbin/init.d/sshd
 sbin/init.d/stat
 sbin/init.d/sysprofiles
@@ -26,6 +24,7 @@ sbin/rc.K
 sbin/rc.M
 sbin/rc.S
 sbin/initscript
+etc/init.d
 etc/initscript
 etc/startup.rc
 .preinit

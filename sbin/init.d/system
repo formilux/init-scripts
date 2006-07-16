@@ -73,10 +73,14 @@ function do_start {
 
     arg=0
     while [ $arg -lt ${#opt_modprobe[*]} ]; do
-	modprobe ${opt_modprobe[$arg]} || return 1
+	if [ "${opt_modprobe[$arg]}" != "#" ]; then
+	    if ! modprobe ${opt_modprobe[$arg]}; then
+		echo "  ==> start $svcname : modprobe ${opt_modprobe[$arg]} failed. Trying anyway."
+	    fi
+	fi
 	arg=$[$arg+1]
     done
-   
+
     if [ -n "$opt_file_max" ]; then
 	echo $opt_file_max > /proc/sys/fs/file-max
     fi

@@ -227,8 +227,8 @@ function do_start {
 	fi
     fi
 
-    ip addr flush dev $instname >/dev/null 2>&1
     ip link set $instname down >/dev/null 2>&1
+    ip addr flush dev $instname >/dev/null 2>&1
 
     if [ "$opt_lladdr" ]; then
 	ip link set $instname address $opt_lladdr
@@ -390,8 +390,8 @@ function do_stop {
 	arg=$[$arg+1]
     done
 
-    ip addr flush dev $instname >/dev/null 2>&1
     ip link set $instname down >/dev/null 2>&1
+    ip addr flush dev $instname >/dev/null 2>&1
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
@@ -449,8 +449,8 @@ function do_flush {
 	arg=$[$arg+1]
     done
 
-    ip addr flush dev $instname >/dev/null 2>&1
     ip link set $instname down >/dev/null 2>&1
+    ip addr flush dev $instname >/dev/null 2>&1
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
@@ -570,8 +570,8 @@ _do_stop()
       if grep -qs $eth /proc/$proc/cmdline ; then kill $proc ; fi
     done   
   fi
-  ip addr flush dev $eth >/dev/null 2>&1
   ip link set $eth down
+  ip addr flush dev $eth >/dev/null 2>&1
   if [ ! -z `eval echo \\$int_"$eth"_slave` ]; then
     for slave in `eval echo \\$int_"$eth"_slave`; do
 	ip link set $slave down arp on

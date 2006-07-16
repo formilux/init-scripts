@@ -1,3 +1,10 @@
+2004/02/01 : 0.3.30
+- squid has been removed
+- etc/init.d points to ../sbin/init.d
+2004/01/01
+- system : modules are now allowed to fail
+- ntp script has been removed
+- network: always set link down before flush addr to workaround a kernel bug
 2003/12/07 : 0.3.29
 - network : added 'ip arp' ; allow modprobe to fail ; add flush & reload
 - rc.S : ordered mounts & automatic mkdir
