@@ -159,9 +159,10 @@ function do_start {
     if [ ${#opt_slave[*]} -gt 0 ]; then
 	for arg in ${opt_slave[*]}; do
 	    if ! $PFULLNAME status $arg >/dev/null 2>&1; then
-		echo "  ==> need to start slave $arg first"
+		echo "  ==> FAILED! need to start slave $arg before $instname"
 	    else
-		ifenslave $instname $arg
+		ifenslave $instname $arg >/dev/null 2>&1
+		ip addr flush dev $arg >/dev/null 2>&1
 	    fi
 	done
     fi

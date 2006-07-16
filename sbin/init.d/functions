@@ -133,6 +133,60 @@ function svc_pidof {
     REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
 }
 
+######################
+# EXPORTED FUNCTIONS #
+######################
+
+# this eventually remounts the filesystem hosting the directory given in the
+# argument read-write. 
+# It returns :
+#   - 0 if it was RO and has successfully been remounted RW
+#   - 1 if it was already RW
+#   - 2 if it could not be remounted RW
+
+function remount_rw {
+   local root
+   set -- $(df $1|tail +2)
+   root=$6
+   set -- $(grep -v '^rootfs' /proc/mounts |cut -f2- -d' '|grep "^$root ")
+   if [ "${3/rw//}" != "$3" ]; then
+      return 1
+   fi
+   echo -n "    - remounting $root read-write ..."
+   if mount -wo remount $root >/dev/null 2>&1; then
+	echo "    => done."
+	return 0
+   else
+	echo "    => failed."
+	return 2
+   fi
+}
+
+# this eventually remounts the filesystem hosting the directory given in the
+# argument read-only. 
+# It returns :
+#   - 0 if it was RW and has successfully been remounted RO
+#   - 1 if it was already RO
+#   - 2 if it could not be remounted RO
+
+function remount_ro {
+   local root
+   set -- $(df $1|tail +2)
+   root=$6
+   set -- $(grep -v '^rootfs' /proc/mounts |cut -f2- -d' '|grep "^$root ")
+   if [ "${3/ro//}" != "$3" ]; then
+      return 1
+   fi
+   echo -n "    - remounting $root read-only ..."
+   if mount -ro remount $root >/dev/null 2>&1; then
+	echo "    => done."
+	return 0
+   else
+	echo "    => failed."
+	return 2
+   fi
+}
+
 ########################################
 # CONFIGURATION FILE LOADING FUNCTIONS #
 ########################################

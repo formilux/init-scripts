@@ -49,7 +49,7 @@ function do_start {
     if [ -z "$opt_runas" ] ; then
 	( $bin $cmdline )
     else
-	( su - $opt_runas $cmdline )
+	( su - $opt_runas -- $cmdline )
     fi
 
     if [ "$?" = 0 ] ; then 
@@ -70,9 +70,14 @@ function do_check {
     run_stat=STOPPED
     uptime=0
   fi
+  if [ ! -e $opt_statusfile ] ; then
+     echo "$HOSTNAME $service.$instance $(date +%s) STOPPED"
+     return 1
+  fi
+   
   read idsvc date status result < $opt_statusfile > /dev/null 2>&1 
   if [ $? != 0 ] ; then 
-    echo "$HOSTNAME $2 $(date +%s) FATAL" ; return 1
+    echo "$HOSTNAME $2 $(date +%s) STOPPED" ; return 1
   fi
 
   diff=$[ $(date +%s) - $date ]

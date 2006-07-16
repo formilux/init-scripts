@@ -134,7 +134,50 @@ function do_status {
     return $return
 }
 
+function do_install {
+    valueof /etc/echelog/modules/sender.conf PrivateKeyFile > /dev/null
+    keyfile=$REPLY
+    valueof /etc/echelog/modules/sender.conf CertificateFile > /dev/null
+    certfile=$REPLY
 
+    if [ ! -e $keyfile ] ; then
+        # generate key
+        openssl genrsa -out $keyfile 1024 || exit 1 
+    fi
+    if [ ! -s $certfile ] ; then
+        echo -n "Country [FR]: " ; read COUNTRY ; COUNTRY=${COUNTRY:-FR}
+        echo -n "State []: "; read STATE
+        echo -n "Locality []: "; read LOCALITY
+        echo -n "Organisation Name []: " ; read ORGA_NAME
+        echo -n "Organisation Unit []: " ; read ORGA_UNIT
+        echo -n "Common Name [$HOSTNAME]: " ; 
+        read COMMON_NAME ; COMMON_NAME=${COMMON_NAME:-$HOSTNAME}
+        echo -n "Email Address []: " ; read EMAIL
+
+        ( echo "[ req ]" ; 
+          echo "default_bits = 1024"
+          echo "default_keyfile = keyfile.pem"
+          echo "distinguished_name = req_distinguished_name"
+          echo "attributes = req_attributes" 
+          echo "prompt = no"
+          echo "[ req_distinguished_name ]"
+          [ "$COUNTRY" ] && echo "C = $COUNTRY"
+          [ "$STATE" ] && echo "ST = $STATE"
+          [ "$LOCALITY" ] && echo "L = $LOCALITY"
+          [ "$ORGA_NAME" ] && echo "O = $ORGA_NAME"
+          [ "$ORGA_UNIT" ] && echo "OU = $ORGA_UNIT"
+          [ "$COMMON_NAME" ] && echo "CN = $COMMON_NAME"
+          [ "$EMAIL" ] && echo "emailAddress = $EMAIL" 
+          echo "[ req_attributes ]" ) > /tmp/req.txt
+
+        openssl req -new -days 1200 -nodes -key $keyfile \
+                    -out /tmp/req.pem -config /tmp/req.txt || exit 1 
+        echo "Merci de certifier la requête suivant:"
+        cat /tmp/req.pem
+        echo "Le certificat généré:"
+        cat > $certfile 
+    fi   
+}
 
 function do_check {
     echo "$HOSTNAME $1.$2 $(date +%s) RUNNING 0 OK"
