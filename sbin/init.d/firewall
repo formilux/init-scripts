@@ -6,7 +6,7 @@ option	confdir		standard_option /etc/firewall
 option	current		standard_option	current
 option	backup		standard_option	backup
 option	maint		standard_option	maint
-option	hashsize	standard_option 65535
+option	hashsize	standard_option 65536
 option	forward		boolean_option	1
 option	filter		boolean_option	1
 option	stateful	boolean_option	1
@@ -27,7 +27,7 @@ function do_help {
     echo "   - current  : subdir  ; def='current'       ; cur=$opt_current"
     echo "   - backup   : subdir  ; def='backup'        ; cur=$opt_backup"
     echo "   - maint    : subdir  ; def='maint'         ; cur=$opt_maint"
-    echo "   - hashsize : integer ; def=65535           ; cur=$opt_hashsize"
+    echo "   - hashsize : integer ; def=65536           ; cur=$opt_hashsize"
     echo "   - forward  : boolean ; def=1               ; cur=$opt_forward"
     echo "   - filter   : boolean ; def=1               ; cur=$opt_filter"
     echo "   - stateful : boolean ; def=1               ; cur=$opt_stateful"
@@ -192,7 +192,7 @@ function verbose_load {
 
 # blocks new external traffic when an error is detected during policy loading.
 function block_on_error {
-    echo "Firewall: ERROR! cannot load any policy file !"
+    echo "Firewall: CRITICAL! cannot load any policy file !"
     # we'll block external traffic and enable internal one in this case
     echo "Firewall: Changing policy to block external traffic..."
     $IPTABLES -t filter -P INPUT DROP
@@ -263,6 +263,56 @@ function do_status {
     return 1
 }
 
+# Load files from the specified directories in the same order
+# the syntax is : { <dir_name> <description> }*
+# It returns 0 if it succeeds, 1 otherwise.
+#
+# eg: $0 $opt_current Current $opt_backup Backup
+
+function load_in_order {
+    local file_found dir_found
+    local file dir 
+
+    file_found=0
+    dir_found=0
+
+    if [ ! -d "$opt_confdir/." ]; then
+        echo "Firewall: CRITICAL: no configuration directory found."
+        echo "          Please create '$opt_confdir'."
+    else
+        while [ $# -gt 1 ]; do
+	    dir="$1" ; shift ; desc="$1" ; shift
+            if [ ! -d "$opt_confdir/$dir/." ]; then
+                echo "Firewall: WARNING: subdirectory '$dir' does not exist."
+                continue
+            fi
+            dir_found=1
+            for file in "conf-$(uname -n).ipt" conf.ipt; do
+                [ -e "$opt_confdir/$dir/$file" ] || continue
+                file_found=1
+                if [ ! -r "$opt_confdir/$dir/$file" ]; then
+                    echo "Firewall: WARNING: skipping unreadable policy file '$opt_confdir/$dir/$file'."
+                    continue
+                fi
+		verbose_load "$desc" "$dir/$file" && return 0
+                echo "Firewall: WARNING: errors found in policy file '$opt_confdir/$dir/$file'. Skipping to next one."
+            done
+        done
+    fi
+
+    if [ $dir_found -eq 0 ]; then
+        echo "Firewall: CRITICAL: no configuration subdirectory found."
+        echo "          Please at least create '$opt_confdir/$opt_current'."
+    fi
+
+    if [ $file_found -eq 0 ]; then
+        echo "Firewall: CRITICAL: no configuration file found."
+        echo "          Please create '$opt_confdir/$opt_current/conf.ipt'."
+    fi
+
+    return 1
+}
+
 
 # load current configuration
 function do_start {
@@ -300,9 +350,7 @@ function do_start {
 	return 0
     fi
 
-    verbose_load Current "$opt_current/conf-$(uname -n).ipt" && return 0
-    verbose_load Backup "$opt_backup/conf-$(uname -n).ipt" && return 0
-    verbose_load Maintenance "$opt_maint/conf-$(uname -n).ipt" && return 0
+    load_in_order "$opt_current" Current "$opt_backup" Backup "$opt_maint" Maint && return 0
     block_on_error
     return 1
 }
@@ -328,9 +376,7 @@ function do_revert {
     flush_rules
     echo "OK."
 
-    verbose_load Backup "$opt_backup/conf-$(uname -n).ipt" && return 0
-    verbose_load Current "$opt_current/conf-$(uname -n).ipt" && return 0
-    verbose_load Maintenance "$opt_maint/conf-$(uname -n).ipt" && return 0
+    load_in_order "$opt_backup" Backup "$opt_current" Current "$opt_maint" Maintenance && return 0
     block_on_error
     return 1
 }
@@ -356,7 +402,7 @@ function do_maint {
     flush_rules
     echo "OK."
 
-    verbose_load Maintenance "$opt_maint/conf-$(uname -n).ipt" && return 0
+    load_in_order "$opt_maint" Maintenance && return 0
     block_on_error
     return 1
 }
