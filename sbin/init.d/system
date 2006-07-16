@@ -38,11 +38,11 @@ function do_start {
 
     if [ "$opt_rtc" = "utc" ]; then
 	echo -n "Setting system time from hardware clock (UTC)... "
-	hwclock --hctosys --utc $rtc_opt
+	hwclock --hctosys --noadjfile --utc $rtc_opt
 	echo "Done."
     elif [ "$opt_rtc" = "local" ]; then
 	echo -n "Setting system time from hardware clock (Local time)... "
-	hwclock --hctosys --localtime $rtc_opt
+	hwclock --hctosys --noadjfile --localtime $rtc_opt
 	echo "Done."
     fi
 
@@ -72,6 +72,7 @@ function do_status {
 function do_stop {
     local svcname=$1
     local instname=$2
+    local rtc_opt=""
 
     arg=${#opt_modprobe[*]}
     while [ $arg -gt 0 ]; do
@@ -79,13 +80,18 @@ function do_stop {
 	rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
     done
 
+    # this is necessary because some PCs (eg: siemens) hang otherwise.
+    if [ "$opt_rtc_mode" = "direct" ]; then
+	rtc_opt="$rtc_opt --directisa"
+    fi
+
     if [ "$opt_rtc" = "utc" ]; then
 	echo -n "Saving system time to hardware clock (UTC)... "
-	hwclock --systohc --utc
+	hwclock --systohc --noadjfile --utc $rtc_opt
 	echo "Done."
     elif [ "$opt_rtc" = "local" ]; then
 	echo -n "Saving system time to hardware clock (Local time)... "
-	hwclock --systohc --localtime
+	hwclock --systohc --noadjfile --localtime $rtc_opt
 	echo "Done."
     fi
 

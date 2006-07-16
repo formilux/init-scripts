@@ -1,3 +1,8 @@
+2003/09/15
+- changelog is now in english
+- functions : a bit more verbose about what is done during start/stop
+- functions : take into account return values from fct_{pre,post}_{start,stop}
+- system: disable saving to drift file and fix directisa on stop.
 2003/09/09
 - rc.S recree utmp
 - ajout de l'option 'modprobe' au script firewall

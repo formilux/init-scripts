@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# sbin/init.d/functions - Formilux init script - version 0.3.14 - 2003-06-19
+# sbin/init.d/functions - Formilux init script - version 0.3.23 - 2003-09-15
 #
 # Copyright (C) 2001-2003 Benoit Dolez & Willy Tarreau
 #       mailto: benoit@ant-computing.com,willy@ant-computing.com
@@ -64,6 +64,7 @@ G_FACILITY=local3
 # LOG FILE
 LOGFILE=/var/log/startup.log
 [ -L "$LOGFILE" ] && rm -f $LOGFILE
+#[ -e "$LOGFILE" ] || touch $LOGFILE && chown root:adm $LOGFILE && chmod 0640 $LOGFILE
 
 # the scripts can list some global variables which they use and that should be
 # unset after processing the service. This is to be set globally.
@@ -337,10 +338,10 @@ function do_start {
     fi
 
     echo "# Starting $p${instname:+[$instname]} ..."
-    declare -F fct_pre_start >/dev/null && fct_pre_start $p $instname
-    logit $cmdline
-    ret=$?
-    declare -F fct_post_start >/dev/null && fct_post_start $p $instname
+    ret=0
+    declare -F fct_pre_start >/dev/null && { fct_pre_start $p $instname ; ret=$?; }
+    [ $ret -eq 0 ] && { logit $cmdline; ret=$?; }
+    [ $ret -eq 0 ] && declare -F fct_post_start >/dev/null && { fct_post_start $p $instname; ret=$?; }
     [ $ret -eq 0 ] && echo "  ==> start $p${instname:+[$instname]} Done." || \
 		    { echo "  ==> start $p${instname:+[$instname]} Failed." ; return 1 ; }
     return 0
@@ -360,6 +361,7 @@ function do_stop_with_pidfile {
     local pidfile=$1
     local pname=$2
     local instname=$3
+    local ret
 
     svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
     
@@ -379,15 +381,33 @@ function do_stop_with_pidfile {
     fi
  
     echo "# Stopping $pname${instname:+[$instname]} (pid $pid according to $pidfile) ..."
-    declare -F fct_pre_stop >/dev/null && fct_pre_stop $pname $instname
-    kill -CONT $pid >/dev/null 2>&1 ; kill -$STOP_FIRST_WITH $pid >/dev/null 2>&1
-    set -- 0 1 2 3
-    while [ -L /proc/$pid/cwd -a $# -gt 0 ] ; do sleep $1 ; shift ; done
-    [ -L /proc/$pid/cwd ] && { kill -9 $pid >/dev/null 2>&1; sleep 1 ; }
-    [ -L /proc/$pid/cwd ] && { echo "  ==> stop $pname${instname:+[$instname]} Failed." ; return 1; }
-    if [ -e "$pidfile" ]; then rm -f "$pidfile"; fi
-    declare -F fct_post_stop >/dev/null && fct_post_stop $pname $instname
-    echo "  ==> stop $pname${instname:+[$instname]} Done."
+
+    ret=0
+    declare -F fct_pre_stop >/dev/null && { fct_pre_stop $pname $instname; ret=$?; }
+    if [ $ret -eq 0 ]; then
+	kill -CONT $pid >/dev/null 2>&1 ; kill -$STOP_FIRST_WITH $pid >/dev/null 2>&1
+
+	set -- 0 1 2 3
+	while [ -L /proc/$pid/cwd -a $# -gt 0 ] ; do
+	    [ $# -eq 4 ] && echo -n '  Waiting.' || echo -n '.'
+	    sleep $1
+	    shift
+	done
+	[ $# -eq 4 ] || echo
+
+	[ -L /proc/$pid/cwd ] && { kill -9 $pid >/dev/null 2>&1; sleep 1 ; }
+	if [ ! -L /proc/$pid/cwd ]; then
+	    if [ -e "$pidfile" ]; then
+		echo "  --> removing stale pid file ..."
+		rm -f "$pidfile"
+	    fi
+	else
+	    ret=1
+	fi
+    fi
+    [ $ret -eq 0 ] && declare -F fct_post_stop >/dev/null && { fct_post_stop $pname $instname; ret=$?; }
+    [ $ret -eq 0 ] && echo "  ==> stop $pname${instname:+[$instname]} Done." || \
+		    { echo "  ==> stop $pname${instname:+[$instname]} Failed." ; return 1; }
     return 0
 }
 
@@ -406,6 +426,7 @@ function do_stop {
     local instname=$2
     local pid
     local retry
+    local ret
     shift
  
     pname=${procname:-$pname}
@@ -422,28 +443,41 @@ function do_stop {
     fi
     echo "# Stopping process $pname${instname:+[$instname]} (pids : $REPLY) ..."
     retry=$REPLY; # save it temporarily
-    declare -F fct_pre_stop >/dev/null && fct_pre_stop $pname $instname
-    REPLY=$retry; retry=0
-    while [ "$REPLY" ]; do
-	retry=$[$retry+1]
-	if [ $retry -le 3 ]; then kill -CONT $REPLY >/dev/null 2>&1 && kill -$STOP_FIRST_WITH $REPLY >/dev/null 2>&1 || break; sleep $retry
-	elif [ $retry -gt 3 ]; then kill -9 $REPLY >/dev/null 2>&1 || break; sleep 1
-	else break; fi
-	REPLY=`ps ho pid $REPLY`
-    done
-    if [ "$REPLY" ]; then
-	echo "  ==> stop $pname${instname:+[$instname]} Failed. (pids : $REPLY)"
-	return 1
-    else
-	declare -F fct_post_stop >/dev/null && fct_post_stop $pname $instname
-	echo "  ==> stop $pname${instname:+[$instname]} Done."
-	return 0
+    ret=0
+    declare -F fct_pre_stop >/dev/null && { fct_pre_stop $pname $instname; ret=$?; }
+    REPLY=$retry; retry=1
+    if [ $ret -eq 0 ]; then
+	while [ "$REPLY" ]; do
+	    if [ $retry -le 3 ]; then
+		kill -CONT $REPLY >/dev/null 2>&1 \
+		  && kill -$STOP_FIRST_WITH $REPLY >/dev/null 2>&1 \
+		    || break
+		[ $retry -eq 1 ] && echo -n '  Waiting.' || echo -n '.'
+		sleep $retry
+	    elif [ $retry -eq 4 ]; then
+		kill -9 $REPLY >/dev/null 2>&1 \
+		  || break
+		echo -n '[killing hard]'
+		sleep 1
+	    else
+		ret=1
+		break
+	    fi
+	    REPLY=`ps ho pid $REPLY`
+	    retry=$[$retry+1]
+	done
+	[ $retry -gt 0 ] && echo
     fi
+
+    retry=$REPLY; # keep a copy
+    [ $ret -eq 0 ] && declare -F fct_post_stop >/dev/null && { fct_post_stop $pname $instname; ret=$?; }
+    [ $ret -eq 0 ] && echo "  ==> stop $pname${instname:+[$instname]} Done." || \
+		    { echo "  ==> stop $pname${instname:+[$instname]} Failed.${retry:+ (pids : $retry)}" ; return 1; }
+    return 0
 }
 
 function do_restart {
-    do_stop $*
-    do_start $*
+    do_stop $* && do_start $*
 }
 
 # returns a basic check of the service, an returns one line of info of the form:
@@ -923,7 +957,9 @@ no name is set :
   - if do_start() exists, it is called with service name and instance name.
     Otherwise, the default do_start() function is called with same args. This
     function calls fct_pre_start() with same args if it exists, just before
-    starting $cmdline, and then fct_post_start() just after.
+    starting $cmdline, and then fct_post_start() just after. Please note that
+    fct_{pre,post}_start() must return 0 if they succeed, otherwise they will
+    report a failure to start the service.
 
 In case of a stop, everything is the same except do_start() which is replaced
 with do_stop(). This last one also calls fct_pre_stop() and fct_post_stop(),
