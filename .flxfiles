@@ -16,7 +16,6 @@ sbin/init.d/system
 sbin/init.d/thttpd
 sbin/init.d/pdnsd
 sbin/init.d/portmap
-sbin/init.d/logrotate
 sbin/init.d/lpd
 sbin/init.d/inetd
 sbin/init.d/dhcpd

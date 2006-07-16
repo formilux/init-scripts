@@ -1,3 +1,6 @@
+2003/11/16 : 0.3.28
+- functions : break possible infinite loop in recursive_rmmod
+- removed buggy logrotate script
 2003/11/12 : 0.3.27
 - network : native use of vlan interfaces. Simply declare an interface with a
   name like "eth1.146" to create vlan 146 on eth1
