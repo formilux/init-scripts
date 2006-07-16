@@ -1,0 +1,33 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config		standard_option	/etc/syslog-ng/syslog-ng.conf
+option	nice		standard_option	0
+option	chain		standard_option
+option	pidfile		reserved_option	/var/run/syslog-ng.pid
+
+option	bin		reserved_option	/sbin/syslog-ng
+option	cmdline		reserved_option	'nice -n $opt_nice $bin -f $opt_config -p $pidfile'
+
+# we might want to start klogd right after syslog-ng
+function fct_post_start {
+    if [ -n "$opt_chain" ]; then
+	/sbin/init.d/$opt_chain start >/dev/null 2>&1 || echo "Error starting $opt_chain."
+    fi
+}
+
+function fct_pre_stop {
+    if [ -n "$opt_chain" ]; then
+        /sbin/init.d/$opt_chain stop >/dev/null 2>&1 || echo "Error stopping $opt_chain."
+    fi
+}
+
+function do_update {
+    if [ -e $pidfile ] ; then 
+        read < $pidfile 
+        [ "$REPLY" ] && kill -HUP $REPLY > /dev/null 2>&1
+    fi
+}
+
+load_config

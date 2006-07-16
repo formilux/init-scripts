@@ -1,0 +1,16 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	bin		reserved_option	/usr/sbin/logrotate
+option	cmdline		reserved_option	'$bin -s $opt_status'
+option  statusfile      standard_option /var/lib/logrotate.status
+
+function fct_pre_start {
+   local t=$( dirname $opt_statusfile )
+   if [ ! -d $t ] ; then
+       mkdir -p -m 755 $t || return 1
+   fi
+}
+
+load_config

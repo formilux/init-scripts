@@ -1,0 +1,20 @@
+#!/bin/sh
+
+/sbin/init.d/sysprofiles /etc/config.rc
+
+#echo 1 > /proc/sys/net/ipv4/ip_forward
+#/sbin/init.d/network restart lo
+#/sbin/modprobe softdog 15
+#/sbin/modprobe button
+#/sbin/modprobe i2c-viapro
+#/sbin/modprobe i2c-isa
+#/sbin/modprobe via686a
+#/sbin/modprobe eeprom
+#/sbin/modprobe via82cxxx_audio
+#/sbin/modprobe usb-uhci
+#/sbin/modprobe usb-storage
+#/sbin/modprobe sd_mod
+##/sbin/modprobe hid
+##/sbin/modprobe mousedev
+##/sbin/modprobe keybdev
+

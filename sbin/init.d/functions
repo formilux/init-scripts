@@ -1,0 +1,906 @@
+#!/bin/bash
+
+#
+# sbin/init.d/functions - Formilux init script - version 0.3.14 - 2003-06-19
+#
+# Copyright (C) 2001-2003 Benoit Dolez & Willy Tarreau
+#       mailto: benoit@ant-computing.com,willy@ant-computing.com
+#
+# This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
+
+# not used ? ## DEBUG FILE
+# not used ? #DEBUG=/tmp/.flx.$PID.$RANDOM
+# not used ? #[ -e "$DEBUG" ] && rm -f $DEBUG && touch $DEBUG
+# not used ? #if [ $? != 0 ] ; then DEBUG="" ; fi
+
+# Test for previous sourcing already in progress
+declare -F build_default_func > /dev/null && return
+
+# SSHD starts this script with "-c" followed by all the parameters grouped into
+# one single string. So we expand it to allow remote commands.
+if [ "$1" = "-c" ]; then shift; set -- $*; fi
+
+# Configuration file to use. Default : /etc/config.rc
+export CONFIG=${CONFIG:-/etc/config.rc}
+
+# Path to startup scripts. Default : /sbin/init.d
+# INIT_PATH=${INIT_PATH:-/sbin/init.d}
+INIT_PATH=${INIT_PATH:-`dirname $0`}
+
+# Process name
+PNAME=`basename $0`
+PPATH=`dirname $0`
+PFULLNAME=$0
+
+# Global variable for status information. Set to "1" while processing the right
+# section.
+RUNNING_SECTION=
+
+# goes "1" if at least one instance of the required service has been found
+SVC_FOUND=
+
+# no particular function defined yet
+DEFINED_FUNCTIONS=
+
+# not in list mode
+MUST_LIST_SECTIONS=
+
+# no option filter
+OPTION_FILTER=
+
+# signal to use at first when stopping a service. Default: TERM
+# May be changed by any init script (eg: sshd)
+STOP_FIRST_WITH=TERM
+
+# set with --force to ignore current status
+FORCE_START_STOP=0
+
+# controls wether the service is being started with --auto
+SVC_AUTO_START=0
+
+# facility for syslog message
+G_FACILITY=local3
+
+# LOG FILE
+LOGFILE=/var/log/startup.log
+[ -L "$LOGFILE" ] && rm -f $LOGFILE
+
+# the scripts can list some global variables which they use and that should be
+# unset after processing the service. This is to be set globally.
+SVC_VARS=
+
+# this is set to $? for the first do_xxx which doesn't return 0
+STATUS_RET=0
+
+########################################
+#           BASIC FUNCTIONS            #
+########################################
+function logit {
+    # echo -n "'"
+    # echo -n "$*" | sed -e "s/'/\\\\'/" -e "s/§/' '/g"
+    # echo "'"
+    echo "  $*"
+    [ "${1##\#*}" -a "xG_FACILITY" != x ] && \
+         logger -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
+           "exec[$USER]: $*"
+    $*
+    local return=$?
+    [ $return != 0 -a "xG_FACILITY" != x ] && \
+         logger -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
+           "exec.error[$USER]: $return"
+    return $return
+}
+
+# returns the value for a given parameter in a config file. The value is both
+# echoed and set to the REPLY variable.
+# The value is found this way :
+# [ \t]*<parameter>[:= \t]*<value>[#]*<comment>$
+
+# usage: valueof CONFIGFILE PARAMETER
+function valueof {
+    if [ -e "$1" ]; then
+        REPLY=$(grep $'^[ \t]*'"$2"'[:= \t]*' $1|sed s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,')
+    else
+        REPLY=
+    fi
+    echo $REPLY
+}
+
+# returns children processes ids.
+# usage: getchild PID ...
+function childrenpid {
+    local found
+    local pid=" $* "
+
+    set -- $( exec ps ahxo ppid,pid ) ; while [ $# -gt 0 ] ; do 
+	    [ -z "${pid/* $1 */}" ] && found="$found $2" ; shift ; shift ; done
+
+    REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
+}
+
+
+# Returns process id from process name only by looking at the process table.
+# (ie: no pidfile used). Only processes which have ppid of 1 (or parent_pid)
+# are returned. A list of pids to omit can be specified with "-o".
+# If no process name is specified, all the parent's children are returned.
+# svc_pidof [ -o "omit_pids*" ]* [ -p parent_pid ] [ PNAME ... ]
+function svc_pidof {
+    local omit=x
+    local ppid=1
+    local comm
+    local found
+
+    while [ $# -gt 0 ] ; do
+	if [ "x$1" = "x-o" ] ; then omit="$omit ${2/%PPID/$$} " ; shift 2
+	elif [ "x$1" = "x-p" ] ; then ppid="$2" ; shift 2
+	else comm="$comm $1 " ; shift 1
+	fi
+    done
+
+    #set -- "$( exec ps ahxo pid,ppid,comm )" ; set -- $( echo "$1" | awk '{ print $1,$2,$3}' )
+    set -- $( ps ahxo pid,ppid,comm | awk '{ print $1,$2,$3}' )
+    while [ $# -gt 0 ] ; do 
+	[ -z "${comm/* $3 */}" -a -n "${omit/* $1 */}" -a "$2" = "$ppid" ] && found="$found $1" 
+	shift ; shift ; shift
+    done
+    REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
+}
+
+# This function starts the given process in background, in a new session,
+# and with all its I/O closed, to ensure that it will not block a TTY if
+# a lazy coder didn't think appropriate to close the file descriptors
+# before forking.
+function daemon {
+    setsid "$@" <&- 1<&- 2<&-  &
+}
+
+######################
+# EXPORTED FUNCTIONS #
+######################
+
+# this eventually remounts the filesystem hosting the directory given in the
+# argument read-write. 
+# It returns :
+#   - 0 if it was RO and has successfully been remounted RW
+#   - 1 if it was already RW
+#   - 2 if it could not be remounted RW
+
+function remount_rw {
+   local root
+   set -- $(df $1|tail +2)
+   root=$6
+   set -- $(grep -v '^rootfs' /proc/mounts |cut -f2- -d' '|grep "^$root ")
+   if [ "${3/rw//}" != "$3" ]; then
+      return 1
+   fi
+   echo -n "    - remounting $root read-write ..."
+   if remountw $root >/dev/null 2>&1; then
+	echo "    => done."
+	return 0
+   else
+	echo "    => failed."
+	return 2
+   fi
+}
+
+# this eventually remounts the filesystem hosting the directory given in the
+# argument read-only. 
+# It returns :
+#   - 0 if it was RW and has successfully been remounted RO
+#   - 1 if it was already RO
+#   - 2 if it could not be remounted RO
+
+function remount_ro {
+   local root
+   set -- $(df $1|tail +2)
+   root=$6
+   set -- $(grep -v '^rootfs' /proc/mounts |cut -f2- -d' '|grep "^$root ")
+   if [ "${3/ro//}" != "$3" ]; then
+      return 1
+   fi
+   echo -n "    - remounting $root read-only ..."
+   if remountr $root >/dev/null 2>&1; then
+	echo "    => done."
+	return 0
+   else
+	echo "    => failed."
+	return 2
+   fi
+}
+
+########################################
+# CONFIGURATION FILE LOADING FUNCTIONS #
+########################################
+
+# All functions handling options get the option name as a first argument,
+# then the rest of the line follows.
+
+# default function for config directive. This one is called only for unmapped
+# options, so either bad ones or unused services.
+function default_config_option {
+    [ "$RUNNING_SECTION" ] && echo "Bad option '$1' in '$*'"
+}
+
+# builtin function to create a variable from an option.
+# The variable name is "opt_$option" where option is the option name.
+function standard_option {
+    if [ "x$2" = "x--disable" ]; then
+	eval "opt_$1="
+    else
+	eval "opt_$1='$2'"
+    fi
+}
+
+# builtin function to create a variable from an option.
+# The variable name is "opt_$option" where option is the option name.
+function boolean_option {
+    if [ "x$2" = "x--disable" ]; then
+	eval "opt_$1=0"
+    else
+	eval "opt_$1=1"
+    fi
+}
+
+# builtin function to create a variable from an option.
+# The variable name is the same as the option name.
+# This is mainly used for reserved options such as "bin" and "cmdline",
+# or to port older startup scripts.
+# The option value is NOT evaluated now, which means that cmdline can refer to
+# $bin if properly quoted. Eg: cmdline '$bin -f $config'
+function reserved_option {
+    if [ "x$2" = "x--disable" ]; then
+	eval "$1="
+    else
+	eval "$1='$2'"
+    fi
+}
+
+# builtin function to create a variable from an option.
+# The variable name is "opt_$option" where option is the option name.
+function long_option {
+    if [ "x$2" = "x--disable" ]; then
+	eval "opt_$1="
+    else
+	local optname=$1
+	shift
+	eval "opt_$optname='$*'"
+    fi
+}
+
+# builtin function to create an array from an option.
+# The variable name is "opt_$option" where option is the option name.
+# The array is extended with all the args for each occurence of the option.
+# If no arg is given, the option is extended with a single dash '#' so that
+# we further know that it has been called.
+function multiple_option {
+    if [ "x$2" = "x--disable" ]; then
+	# in case of multiple_option, "no <option> <args>" only
+	# means that we don't want to add <args> to <option>,
+	# but not that we want to clear <option>
+	# eval "opt_$1=( )"
+	:
+    else
+	local optname=$1
+	shift
+	if [ $# -gt 0 ]; then
+	    #eval "opt_$optname=( \$opt_$optname \"$*\" )"
+	    eval "opt_$optname[\${#opt_$optname[*]}]='$*'"
+	else
+	    # if no option is set, this reference will be lost because in fact
+	    # it will be added as an empty entry in the list. So we replace it
+	    # with a dash '#' to mark it as referenced.
+	    eval "opt_$optname[\${#opt_$optname[*]}]='#'"
+	fi
+    fi
+}
+
+# default start function
+# usage : do_start process_name [instance_name]
+# if functions fct_pre_start() and fct_post_start() are defined, they will be
+# called just before and just after the cmdline.
+function do_start {
+    local p=$1
+    local instname=$2
+    local ret
+    do_status $p $instname > /dev/null 2>&1
+    if [ $? = 0  -a $FORCE_START_STOP -eq 0 ] ; then
+	echo "Process $p${instname:+[$instname]} already running."
+	[ $SVC_AUTO_START -eq 0 ] && echo "  ==> please use '--force' or 'restart' instead or check with 'status'."
+	return 0
+    fi
+
+    echo "# Starting $p${instname:+[$instname]} ..."
+    declare -F fct_pre_start >/dev/null && fct_pre_start $p $instname
+    logit $cmdline
+    ret=$?
+    declare -F fct_post_start >/dev/null && fct_post_start $p $instname
+    [ $ret -eq 0 ] && echo "  ==> start $p${instname:+[$instname]} Done." || \
+		    { echo "  ==> start $p${instname:+[$instname]} Failed." ; return 1 ; }
+    return 0
+}
+
+#
+# This function tries to stop the process whose pid is specified in the file
+# in $1. It returns 0 if the process is stopped, or 1 if it is still running.
+# There can be only one pid per pidfile.
+#
+# usage : do_stop_with_pidfile pidfile [process_name [instance_name]]
+# if functions fct_pre_stop() and fct_post_stop() are defined, they will be
+# called just before and just after a successful kill sequence.
+function do_stop_with_pidfile {
+    local pid
+    local pids
+    local pidfile=$1
+    local pname=$2
+    local instname=$3
+
+    svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
+    
+    if [ $FORCE_START_STOP -eq 0 ]; then
+	if ! [ -r "$pidfile" ] || { read pid REPLY <"$pidfile"; [ -z "$pid" ]; } || ! [ -L /proc/$pid/cwd ]; then
+	    echo "# Process $pname${instname:+[$instname]} already stopped (according to $pidfile)${pids:+, but check pids : $pids}"
+	    # ensure that we remove stale files
+	    [ -e "$pidfile" ] && echo "Removing stale pid file" && rm -f "$pidfile"
+	    return 0
+	fi
+    fi
+
+    valueof /proc/$pid/status Name >/dev/null ; set -- $REPLY
+    if [ "$pname" -a "x$pname" != "x$1" -a $FORCE_START_STOP -eq 0 ]; then
+	echo "# The pid in $pidfile points to a wrong process name ($pid:$1)${pids:+. Check $pids for $pname${instname:+[$instname]}}."
+	return 1;
+    fi
+ 
+    echo "# Stopping $pname${instname:+[$instname]} (pid $pid according to $pidfile) ..."
+    declare -F fct_pre_stop >/dev/null && fct_pre_stop $pname $instname
+    kill -CONT $pid >/dev/null 2>&1 ; kill -$STOP_FIRST_WITH $pid >/dev/null 2>&1
+    set -- 0 1 2 3
+    while [ -L /proc/$pid/cwd -a $# -gt 0 ] ; do sleep $1 ; shift ; done
+    [ -L /proc/$pid/cwd ] && { kill -9 $pid >/dev/null 2>&1; sleep 1 ; }
+    [ -L /proc/$pid/cwd ] && { echo "  ==> stop $pname${instname:+[$instname]} Failed." ; return 1; }
+    if [ -e "$pidfile" ]; then rm -f "$pidfile"; fi
+    declare -F fct_post_stop >/dev/null && fct_post_stop $pname $instname
+    echo "  ==> stop $pname${instname:+[$instname]} Done."
+    return 0
+}
+
+#
+# default stop function
+# If a pidfile exists, it is used. Otherwise, all pids with same name which have
+# init for parent will be killed.
+# The function returns 0 if the process is(are) stopped, and 1 if not all could
+# be stopped.
+#
+# usage : do_stop process_name [instance_name]
+# if functions fct_pre_stop() and fct_post_stop() are defined, they will be
+# called just before and just after a successful kill sequence.
+function do_stop {
+    local pname=$1
+    local instname=$2
+    local pid
+    local retry
+    shift
+ 
+    pname=${procname:-$pname}
+    # stop service from pidfile 
+    [ "x$pidfile" != x ] && { do_stop_with_pidfile $pidfile $pname $instname; return $? ; }
+
+    # stop service from pidof data
+    svc_pidof -o $$ $pname > /dev/null
+    if [ -z "$REPLY" ]; then
+	echo "# Process $pname${instname:+[$instname]} already stopped, cleaning up..."
+	declare -F fct_post_stop >/dev/null && fct_post_stop $pname $instname
+	echo "  ==> stop $pname${instname:+[$instname]} Done."
+	return 0
+    fi
+    echo "# Stopping process $pname${instname:+[$instname]} (pids : $REPLY) ..."
+    retry=$REPLY; # save it temporarily
+    declare -F fct_pre_stop >/dev/null && fct_pre_stop $pname $instname
+    REPLY=$retry; retry=0
+    while [ "$REPLY" ]; do
+	retry=$[$retry+1]
+	if [ $retry -le 3 ]; then kill -CONT $REPLY >/dev/null 2>&1 && kill -$STOP_FIRST_WITH $REPLY >/dev/null 2>&1 || break; sleep $retry
+	elif [ $retry -gt 3 ]; then kill -9 $REPLY >/dev/null 2>&1 || break; sleep 1
+	else break; fi
+	REPLY=`ps ho pid $REPLY`
+    done
+    if [ "$REPLY" ]; then
+	echo "  ==> stop $pname${instname:+[$instname]} Failed. (pids : $REPLY)"
+	return 1
+    else
+	declare -F fct_post_stop >/dev/null && fct_post_stop $pname $instname
+	echo "  ==> stop $pname${instname:+[$instname]} Done."
+	return 0
+    fi
+}
+
+function do_restart {
+    do_stop $*
+    do_start $*
+}
+
+# returns a basic check of the service, an returns one line of info of the form:
+# <hostname> <service_name>.[instance_name] <date_in_secs>  {RUNNING|STOPPED}[,more_info] [{OK|CONFIG_CHANGED}]
+# returns 0 if running.
+function do_check {
+    local run_stat
+    local status=OK
+    local ret uptime=0
+    local pid
+
+    do_status $1 $2 > /dev/null
+    ret=$?
+    if [ $ret -eq 0 ]; then
+	if [ "$REPLY" ]; then
+	    for pid in $REPLY; do
+		uptime=$[$(date +%s)-$(date -d "`ps ho lstart $pid`" +%s)]
+		echo "`uname -n` $1.$2 `date +%s` RUNNING $uptime $status"
+	    done
+	else
+	    echo "`uname -n` $1.$2 `date +%s` RUNNING 0 $status"
+	fi
+    else
+        run_stat=STOPPED
+	case $ret in
+	    1)  status=ALERT,nofile ;;
+	    2)  status=ALERT,nopid  ;;
+	    3)  status=ALERT,other  ;;
+	    *)  status=ALERT        ;;
+	esac
+	echo "`uname -n` $1.$2 `date +%s` $run_stat $uptime $status"
+    fi
+    return $ret
+}
+
+# returns 0 if the process is running, 1 if the pid file does not exist,
+# 2 if the pid doesn't exist anymore, 3 if it has been affected to another
+# process name. If the process is running, REPLY is set to its pid.
+# usage : do_status_with_pidfile pidfile [process_name [instance_name]]
+function do_status_with_pidfile {
+    local pidfile=$1
+    local pname=$2
+    local instname=$3
+    local pid
+
+    [ -r "$pidfile" ] || { echo "Process $pname${instname:+[$instname]} stopped (no pidfile present)" ; return 1 ; }
+    read pid < $pidfile
+    [ -L /proc/$pid/cwd ] || { echo "Process $pname${instname:+[$instname]} stopped (from pidfile)" ; return 2 ; }
+    valueof /proc/$pid/status Name >/dev/null ; set -- $REPLY
+    [ "$pname" -a "x$pname" = "x$1" ] || {
+	echo "Process with an other name ($1,$pid) already running."
+	echo "  ==> you should remove invalid pidfile $pidfile"
+	return 3
+    }
+    childrenpid $pid > /dev/null
+    local cpid=$*
+    echo "Process $pname${instname:+[$instname]} running : $pid ${cpid:+($cpid)}"
+    REPLY=$pid
+    return 0
+}
+
+# returns 0 if the process is running; 1 if it's stopped and there's no pid file,
+# otherwise same as do_status_with_pidfile(). If the process is running, REPLY is
+# set to its pid.
+# usage : do_status process_name [instance_name]
+function do_status {
+    local pname=$1
+    local instname=$2
+    shift
+
+    pname=${procname:-$pname}
+    # get info from pidfile if it exist 
+    [ "x$pidfile" != x ] && { do_status_with_pidfile $pidfile $pname $instname; return $? ; }
+    
+    # get info from pidof command
+    svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
+    [ "$pids" ] && { echo "Process $pname${instname:+[$instname]} running without pidfile : $pids" ; return 0 ; }
+    echo "Process $pname${instname:+[$instname]} stopped (no pidfile used)."
+    return 1
+}
+
+# lists all the known options for the current service, with their default or
+# assigned values. There is a double eval so that options depending on others
+# are correctly resolved.
+# The output format is "process_name.[instance_name] option value"
+# usage : list_options process_name [instance_name]
+function do_list_options {
+    local i=0
+    local occur=0
+    local nbocc=0
+    local inst="$1.$2"
+
+    while [ $i -lt $svc_nbopts ]; do
+	if [ -z "$OPTION_FILTER" -o "$OPTION_FILTER" = "${svc_opts[$i]}" ]; then
+
+
+	    if [ "${svc_fcts[$i]}" = "boolean_option" -o \
+		 "${svc_fcts[$i]}" = "standard_option" -o \
+		 "${svc_fcts[$i]}" = "long_option" -o \
+		 "${svc_fcts[$i]}" = "reserved_option" ]; then
+		    eval eval echo $inst ${svc_opts[$i]} \$"${svc_vars[$i]}"
+	    elif [ "${svc_fcts[$i]}" = "multiple_option" ]; then
+		eval nbocc='${#'"${svc_vars[$i]}"'[*]}'
+		if [ $nbocc -eq 0 ]; then # no value, let's at least show the option name
+		    eval echo $inst ${svc_opts[$i]}
+		else
+		    while [ $occur -lt $nbocc ]; do
+			eval eval echo $inst ${svc_opts[$i]} '${'"${svc_vars[$i]}"'[$occur]}'
+			occur=$[$occur+1]
+		    done
+		fi
+	    else
+		echo $inst ${svc_opts[$i]} "[defined by script]"
+	    fi
+	fi
+	i=$[$i+1]
+    done
+}
+
+# maps an option to a function. Existing options are simply overridden.
+# usage: option option_name function_name [ defaults ]
+function option {
+    local name=$1
+    local fct=$2
+    local def=$3
+    local opt=0
+
+    # first, check if this option has already been defined, and return its
+    # index, or a new one if it's new.
+    while : ; do
+	if [ $opt -ge $svc_nbopts ]; then svc_nbopts=$[$opt+1]; break; fi
+	if [ "x$name" = "x${svc_opts[$opt]}" ]; then break; fi
+	opt=$[$opt+1]
+    done
+
+    svc_opts[$opt]=$name
+    svc_fcts[$opt]=$fct
+    svc_defs[$opt]=$def
+    if [ "x$fct" = "xboolean_option" -o "x$fct" = "xstandard_option" -o \
+	 "x$fct" = "xlong_option" -o "x$fct" = "xmultiple_option" ]; then
+	svc_vars[$opt]=opt_$name
+    elif [ "x$fct" = "xreserved_option" ]; then
+	svc_vars[$opt]=$name
+    else
+	svc_vars[$opt]=""
+    fi
+
+    #eval "function $1 { $2 $1 \$* ; }"
+}
+
+# This function is called once at load time. It scans the config file for all
+# referenced options, and assigns them to a quiet function which yells only
+# an unknown option has been referenced in a requested section. The options are
+# discovered by reading all the first words.
+#
+# usage: build_default_func config_file
+function build_default_func {
+    local file=$1
+    [ -f $file ] || return 1 
+    # undefine all previously defined functions
+    for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
+    DEFINED_FUNCTIONS=`awk '{gsub("#.*", "", $1); \
+                           if (match($1, "^[a-zA-Z0-9][a-zA-Z0-9_]*$")) \
+                           print $1 | "sort -u" }' $file `
+    # get all first words and build a default function
+    for i in $DEFINED_FUNCTIONS ; do
+	if ! eval "declare -F $i > /dev/null" ; then 
+	    eval "function $i { default_config_option $i \$* ; } "
+	fi 
+    done
+}
+
+# default 'service' function.
+# Called as default_service svc_name [svc_instance] from load_config.
+# SVC_ARGS is set from the service command line, and is used at next one.
+function default_service {
+    local ret
+    local opt
+    local val
+    # skip first parameter (probably 'service')
+    #shift  
+
+    # we're in listing mode, we do nothing except listing the services
+    if [ "$MUST_LIST_SECTIONS" = 1 -a $# -ge 1 ]; then
+	[ "$1" != "${SVC_ARGS[0]}" -o "$2" != "${SVC_ARGS[1]}" ] && echo $*
+	SVC_ARGS=( $* )
+	return
+    fi
+
+    # check for running selected service
+    if [ "$RUNNING_SECTION" = 1 ]; then
+	# first, we'll check wether the next service is *exactly* the same as
+	# the current one, in which case they are merged, in order to avoid
+	# duplicate starts (system for example)
+	if [ "$PNAME" = "$1" -a "${SVC_ARGS[0]}" = "$2" ]; then
+	    return
+	fi
+
+	# try to insert command-line options
+	while [ "$FORCE_OPTIONS" ]; do  # "opt=val,opt=val..."
+	    opt=${FORCE_OPTIONS%%,*}
+	    val=${opt#*=}
+	    opt=${opt%%=*}
+	    eval $opt $val
+	    if [ "${FORCE_OPTIONS%%*,*}" ]; then # no more ','
+		break;
+	    else
+		FORCE_OPTIONS=${FORCE_OPTIONS#*,}
+	    fi
+	done
+
+	# unset all options to avoid conflicts with commands (eg: modprobe, ip ...)
+	for i in $DEFINED_FUNCTIONS; do
+	    case "$i" in
+		service|section|interface) ;;
+		*) unset -f $i ;;
+	    esac
+	done
+
+	# force a last eval on each reserved option so that they can refer to
+	# each other.
+	for i in bin pidfile procname cmdline; do eval eval "$i=\\\"\$$i\\\""; done
+
+	# now if the script defines a fct_end_section() function, let's call
+	# it to fix some values, or extract som from external config files.
+	declare -F fct_end_section > /dev/null && fct_end_section $PNAME ${SVC_ARGS[*]}
+
+
+	if [ "$SVC_AUTO_START" = 0 -o "$autostart" = 1 ]; then
+	    if declare -f do_$ACTION >/dev/null; then
+		do_$ACTION $PNAME ${SVC_ARGS[*]}
+	    else
+		if declare -f do_help >/dev/null; then
+		    do_help
+		else
+		    echo "Error: Unknown action : $ACTION"
+		fi
+	    fi
+	fi
+	ret=$?
+	if [ $ret -gt 0 ]; then
+	    STATUS_RET=$ret
+	fi
+
+        if [ "x$G_FACILITY" != x ] ; then
+          if [ "x$ACTION" = xstart -o "x$ACTION" = xstop \
+               -o "x$ACTION" = xrestart ] ; then 
+            if [ $ret -gt 0 ] ; then
+              logger -p $G_FACILITY.err -t flxi[$$].$PNAME -- \
+                  "error[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]} = $ret"
+            else
+              logger -p $G_FACILITY.info -t flxi[$$].$PNAME -- \
+                  "done[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
+            fi 
+          fi
+        fi
+	unset -v RUNNING_SECTION SVC_ARGS bin cmdline pidfile procname $SVC_VARS
+
+	# reset all options to the default option
+	for i in $DEFINED_FUNCTIONS; do
+	    case "$i" in
+		service|section|interface) ;;
+		*) unset -f $i
+		   eval "function $i { default_config_option $i \$* ; } "
+		   ;;
+	    esac
+	done
+    fi
+
+    # if service is the one wished, start it at the end
+    if test "x$1" = "x$PNAME" -a \
+	    \( "x$2" = "x${SVC_INSTANCE[0]}" -o "x${SVC_INSTANCE[0]}" = "x" \) ; then
+	# we can test difference between SVC_ARGS and SVC_INSTANCE
+	SVC_FOUND=1
+	RUNNING_SECTION=1
+	shift
+	SVC_ARGS=( $* )
+
+	# reset every variable
+	unset -v ${svc_vars[*]}
+
+	# map all options to their functions, and set default vars.
+	i=0
+	while [ $i -lt $svc_nbopts ]; do
+	    eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "
+	    if [ "${svc_vars[$i]}" ]; then
+		if [ "x${svc_fcts[$i]}" != "xmultiple_option" ]; then
+		    eval "${svc_vars[$i]}='${svc_defs[$i]}'"
+		else
+		    eval "${svc_vars[$i]}=( )"
+		fi
+	    fi
+	    i=$[$i+1]
+	done
+
+	# now if the script defines a fct_begin_section() function, let's call
+	# it to preset some default values from external config files.
+	unset -v $SVC_VARS
+	declare -F fct_begin_section > /dev/null && fct_begin_section $PNAME ${SVC_ARGS[*]}
+    fi
+}
+
+# 'no' for 'no ... ', disable a service or an option
+function default_no {
+    local req=$1
+    shift
+    case "$req" in
+	"service")
+	    default_service
+	    ;;
+	"section")
+	    default_service
+	    ;;
+        "interface")
+	    default_service
+	    ;;
+	*)
+	    if [ "$MUST_LIST_SECTIONS" = 1 ]; then
+		return
+	    fi
+	    local opt=0
+	    while : ; do
+	    	if [ $opt -ge $svc_nbopts ]; then
+		    # non error since we don't know if this is a valid word.
+	    	    return
+	    	fi
+	    	if [ "x$req" = "x${svc_opts[$opt]}" ]; then
+	    	    if [ "x${svc_fcts[$opt]}" != "xmultiple_option" ]; then
+			eval "${svc_vars[$opt]}=''"
+	    	    else
+			# in case of multiple_option, "no <option> <args>" only
+			# means that we don't want to add <args> to <option>,
+			# but not that we want to clear <option>
+	    		# eval "${svc_vars[$opt]}=( )"
+			:
+	    	    fi
+	    	    break
+	    	fi
+	    	opt=$[$opt+1]
+	    done
+
+	    # this doesn't work because $req is launched under a subshell !
+	    #if declare -F $req >/dev/null; then
+	    #    eval "$req --disable $*"
+	    #fi
+    esac
+}
+
+# source configuration file, called last.
+function load_config {
+    # defines functions for all first words in the config file
+    build_default_func $CONFIG
+
+    # defines functions for reserved keywords: no, service, section, interface.
+    function no { default_no $*; }
+    function service { default_service $*; }
+    function section { default_service $*; }
+    function interface {
+	if [ "$PNAME" = "network" ]; then
+	    echo "Warning: use of 'interface $1' keyword is deprecated. Use 'section network $1' instead.";
+	fi
+	default_service network $*;
+    }
+
+    if test ! -d "$CONFIG" -a -e "$CONFIG" ; then 
+	# first keywords out of a section space are for the system, so let's enter
+	# automatically in system section.
+	service system
+	. $CONFIG
+	service ""
+    fi
+
+    if [ "$SVC_FOUND" != 1 -a "$MUST_LIST_SECTIONS" != 1 ]; then
+	echo "Service/instance not found in $CONFIG, using default values."
+	service $PNAME ; service ""
+
+        #[ "x$G_FACILITY" != x ] && \
+        #   logger -p $G_FACILITY.warn -t "flxi[$$].$PNAME" -- \
+        #     "unknown[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
+	exit 1
+    fi
+    return $STATUS_RET
+}
+
+# abort the process after displaying an error message.
+die() {
+    echo $* >&2
+    exit 1
+}
+
+##################################
+#   ALWAYS LOADED WHEN SOURCED   #
+##################################
+# build default undefined functions
+
+svc_opts=( )
+svc_vars=( )
+svc_defs=( )
+svc_fcts=( )
+svc_nbopts=0
+
+while [ $# -gt 0 ] ; do
+    case "$1" in
+    -f|--file)	# use this configuration file
+	export CONFIG=$2
+	shift 2 || die "Error: missing arg for --file, try --help."
+	;;
+    --auto)	# only start services which don't have a "no autostart" statement
+	SVC_AUTO_START=1
+	shift
+	;;
+    --force)	# force start or stop disregarding current status
+	FORCE_START_STOP=1
+	shift
+	;;
+    --list_sections)	# list all known sections
+	MUST_LIST_SECTIONS=1
+	load_config
+	exit 0
+	;;
+    --filter_option)	# display only this option in list_options
+	OPTION_FILTER=$2
+	shift 2 || die "Error: missing arg for --filter_option, try --help."
+	;;
+    -o|--option)	# force options : -o "opt=val,opt=val..."
+	FORCE_OPTIONS=$2
+	shift 2 || die "Error: missing arg for --option, try --help."
+	;;
+    -*)
+	echo "Common commands : start, stop, restart, status, check, list_options."
+	echo "Global options :"
+	grep $'^[ \t]*-[-a-z0-9_|]*)[ \t]*# ' $PPATH/functions | \
+	    sed -e $'s/^\\([ \t]*\\)\\([^)]*\\)\\([ \t#)]*\\)\\(.*\\)/    \\2\t\t\\4/'
+	echo "Other options :"
+	declare -F usage > /dev/null && usage $* || \
+	    echo "    -h|--help		display this help" && \
+		[ "x$USAGE" != x ] && echo "$USAGE"
+	exit 1
+	;;
+    *)
+	break 
+	;;
+    esac
+done
+
+# Assign the requested action to ACTION (first arg). Default : start
+ACTION=${1:-start}; shift
+
+# Assign the requested instances to SVC_INSTANCE. Default : ""
+SVC_INSTANCE=( $* )
+
+# most services don't need to redefine the keywords "bin", "cmdline",
+# "pidfile", "procname" and "check_interval", so let's initialize them now.
+# This also means that any service can use these options without declaring them.
+option	bin		reserved_option
+option	cmdline		reserved_option '$bin'
+option	pidfile		reserved_option
+option	procname	reserved_option
+option	check_interval	reserved_option	0
+option	autostart	reserved_option	1
+
+return 0
+
+######### end of script, here comes some documentation #########
+
+When a service is started, these operations are performed for each section
+containing the same name, and the same instance name if any, or any instance if
+no name is set :
+
+  - options variables are initialized to their default values
+  - if fct_begin_section() exists, it is called with service name and instance name
+  - options are interpreted
+  - bin,pidfile,cmdline,procname are converted through an eval so that they can
+    reference variables options with '$name' or '$opt_name'.
+  - if fct_end_section() exists, it is called with service name and instance name
+  - if do_start() exists, it is called with service name and instance name.
+    Otherwise, the default do_start() function is called with same args. This
+    function calls fct_pre_start() with same args if it exists, just before
+    starting $cmdline, and then fct_post_start() just after.
+
+In case of a stop, everything is the same except do_start() which is replaced
+with do_stop(). This last one also calls fct_pre_stop() and fct_post_stop(),
+but this last one only if the stop is successful.
+
+If the service is started as "service --auto start", the option "autostart" is
+checked, and if set to 0, the service will not start. This is useful to
+differentiate between configured services and enabled services.

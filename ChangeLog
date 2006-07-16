@@ -1,0 +1,49 @@
+2003/06/19
+- correction d'un bug dans functions : lors de l'évaluation d'un service,
+  toutes les options des autres services n'étaient pas invalidées, ce qui
+  posait des problèmes pour certaines commandes (ex: modprobe)
+- appel de la fonction "do_help" si une action est inconnue
+- ajout du script firewall
+- ajout des paramètres speed,duplex,auto à network, et support de ethtool
+- release de la 0.3.15 qui corrige les bugs introduits dans la 0.3.14 !
+2003/06/17
+- déplacement de /sbin/init.d/syslog-ng vers le package syslog-ng
+- création de /var/log en root:log:2750
+2003/06/16
+- ajout de la fonction 'daemon' qui permet de lancer un processus
+  détaché de ses file-descripteurs, du tty et du process père.
+- cron utilise désormais daemon sinon une machine démarrant cron ne
+  peut pas finir de s'initialiser car il ne ferme pas ses fd avant le
+  fork !
+2003/06/12
+- correction de la lecture du pid dans functions
+- valueof ne fait le grep que si le fichier existe
+- correctifs sur le script ntp
+2003/06/05
+- petits correctifs et quelques mises à jour
+- plusieurs scripts comprennent dorénavant l'option nice
+- script squid
+- droits un peu moins restrictifs sur certains fichiers
+2003/02/18
+- création de /var/state (utilisé par dhcp par exemple)
+- correction de mouse : utilise /usr/sbin/gpm et redirige std* vers /dev/null
+- functions : do_stop_with_pidfile supprime les fichiers de pid restants (gpm...)
+- rc.M : cesse de lancer cron et atd, ce n'est pas à lui de le faire.
+- rectification de rc.S : bash ne teste pas l'état R/W des filesystems, donc on
+  crée des fichiers temporaires. De plus, tentative coûte que coûte de créer /tmp.
+- dans rc.S, en cas d'erreur, on remonte tout en R/O au lieu du sulogin qui stoppe
+  le démarrage du système.
+- correction des droits de /var dans /.preinit + ajout de quelques entrées
+2003/02/09:
+- on peut maintenant lancer des services même si la section n'existe pas dans
+  config.rc
+- sbin/init.d/system utilise désormais /proc pour positionner hostname et domainname.
+2003/01/26: echelog
+- lecture du fichier de configuration de echelog, déduction des sous fichiers
+  de configuration et des répertoires de spool
+- do_stop spécifique
+20030115-b :
+- ntp: option keys à utiliser sous la forme opt_keys dans cmdline
+- ntp: positonnel procname à ntpd 
+* echelogd: traiter l'impossibilité d'ouverture pour cause de mauvais
+  positionnement dans le cache du Sender/Receiver

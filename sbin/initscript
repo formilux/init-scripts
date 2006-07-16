@@ -1,0 +1,10 @@
+#!/bin/sh
+
+umask 022
+PATH=/bin:/sbin:/usr/sbin:/usr/bin
+export PATH
+
+BOOTID=`cat /proc/sys/kernel/random/boot_id`
+export BOOTID
+
+eval exec "$4"

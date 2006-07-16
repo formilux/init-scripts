@@ -1,0 +1,212 @@
+#!/bin/bash 
+
+. `dirname $0`/functions
+
+option	confdir		standard_option /etc/firewall
+option	current		standard_option	current
+option	backup		standard_option	backup
+option	hashsize	standard_option 65535
+option	forward		boolean_option	1
+option	filter		boolean_option	1
+option	stateful	boolean_option	1
+option	nat		boolean_option
+
+IPTABLES=/sbin/iptables
+IPRESTORE=/sbin/iptables-restore
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|revert|stop|route|block>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - confdir  : dir     ; def='/etc/firewall' ; cur=$opt_confdir"
+    echo "   - current  : subdir  ; def='current'       ; cur=$opt_current"
+    echo "   - backup   : subdir  ; def='backup'        ; cur=$opt_backup"
+    echo "   - hashsize : integer ; def=65535           ; cur=$opt_hashsize"
+    echo "   - forward  : boolean ; def=1               ; cur=$opt_forward"
+    echo "   - filter   : boolean ; def=1               ; cur=$opt_filter"
+    echo "   - stateful : boolean ; def=1               ; cur=$opt_stateful"
+    echo "   - nat      : boolean ; def=                ; cur=$opt_nat"
+    echo
+    echo "The configuration file is $opt_confdir/$opt_current/conf-$(uname -n).ipt"
+    echo
+    exit 1 
+}
+
+# it will try to unload module $1 and all modules which depend on it
+function recursive_rmmod {
+    local -a args
+    local mod
+
+    while : ; do
+	args=( $(/sbin/lsmod|grep "^$1 "|tr -d '\[\]') )
+	[ ${#args[@]} -gt 0 ] || return 0
+	if [ "${args[2]}" = "0" ]; then
+	    rmmod $1
+	    return $?
+	else
+	    mod=3
+	    while [ $mod -lt ${#args[@]} ]; do
+		if ! recursive_rmmod ${args[$mod]}; then
+		    echo "Error: could not unload module ${args[$mod]}."
+		    return 1
+		fi
+		(( mod++ ))
+	    done
+	fi
+    done
+}
+
+# starts the firewall with the specified config.
+# if none is specified, no configuration is loaded.
+# - disables ip_forwarding. It's up to the caller to
+#   enable it after initialization.
+# - sets INPUT/OUTPUT/FORWARD policies to DROP
+# returns 1 if the config could not be loaded.
+function start_with_config {
+    local table chain chains
+
+    echo 0 > /proc/sys/net/ipv4/ip_forward
+
+    echo "Firewall: loading modules..."
+    /sbin/modprobe ip_tables
+    /sbin/modprobe iptable_filter
+    if [ -n "$opt_stateful" ]; then
+    	/sbin/modprobe ip_conntrack hashsize=$opt_hashsize
+    	[ -n "$opt_nat" ] && /sbin/modprobe iptable_nat
+    fi
+
+    # filter chain has a default policy set to DROP
+    echo "Firewall: setting default policy to DROP..."
+    for chain in INPUT OUTPUT FORWARD; do
+	$IPTABLES -t filter -P $chain DROP
+    done
+
+    # flush all rules in all tables
+    echo "Firewall: Flushing all rules..."
+    for table in mangle filter ${opt_stateful:+${opt_nat:+nat}}; do
+	$IPTABLES -t $table -F
+	$IPTABLES -t $table -X
+    done
+
+    # other chains have a default policy set to ACCEPT
+    for table in mangle ${opt_stateful:+${opt_nat:+nat}}; do
+	chains=$($IPTABLES -t $table -L | grep "^Chain " | cut -f2 -d' ')
+	for chain in $chains; do
+	    $IPTABLES -t $table -P $chain ACCEPT
+	done
+    done
+
+    if [ -n "$1" ]; then
+        echo "Firewall: loading configuration file $opt_confdir/$1..."
+	if ! [ -r "$opt_confdir/$1" ] || ! $IPRESTORE < $opt_confdir/$1; then
+	    echo "Firewall: Error! cannot load configuration file !"
+	    return 1
+	fi
+    fi
+    return 0
+}
+
+# checks wether the firewall modules are loaded
+function do_status {
+    if [ -e /proc/net/ip_tables_names ]; then
+	if [ -n "$(cat /proc/net/ip_tables_names)" ]; then
+	    echo "Firewall modules are loaded."
+	    return 0
+	fi
+    fi
+    echo "Firewall modules are not loaded."
+    return 1
+}
+
+# stops the firewall and unloads the modules
+function do_stop {
+    # stop forwarding
+    echo "Firewall: disabling IP forwarding..."
+    echo 0 > /proc/sys/net/ipv4/ip_forward
+
+    if [ -e /proc/net/ip_tables_names ] ; then
+        echo "Firewall: flushing all rules..."
+        # flush all rules in all tables
+        for table in $(cat /proc/net/ip_tables_names); do
+	    $IPTABLES -t $table -F
+	    $IPTABLES -t $table -X
+	    # all chains have a default policy set to ACCEPT
+	    chains=$($IPTABLES -t $table -L | grep "^Chain " | cut -f2 -d' ')
+	    for chain in $chains; do
+	        $IPTABLES -t $table -P $chain ACCEPT
+	    done
+        done
+    fi 
+
+    # then unload the firewall modules
+    echo "Firewall: unloading modules..."
+    recursive_rmmod iptable_nat
+    recursive_rmmod ip_conntrack
+    recursive_rmmod iptable_filter
+    recursive_rmmod ip_tables
+    echo "Firewall: unloaded successfully."
+}
+
+# block all incoming/outgoing traffic, but allows local
+# communications
+function do_block {
+    do_stop
+
+    # we force some options to ensure proper blocking
+    unset opt_stateful
+    unset opt_forward
+    opt_filter=1
+
+    start_with_config
+    echo "Firewall: Changing policy to block external traffic..."
+    $IPTABLES -t filter -A INPUT -i lo -j ACCEPT
+    $IPTABLES -t filter -A OUTPUT -o lo -j ACCEPT
+    $IPTABLES -t mangle -P PREROUTING DROP
+    $IPTABLES -t mangle -P INPUT DROP
+    $IPTABLES -t mangle -P FORWARD DROP
+    $IPTABLES -t mangle -P POSTROUTING DROP
+    $IPTABLES -t mangle -P OUTPUT DROP
+    $IPTABLES -t mangle -A PREROUTING -i lo -j ACCEPT
+    $IPTABLES -t mangle -A INPUT -i lo -j ACCEPT
+    $IPTABLES -t mangle -A POSTROUTING -o lo -j ACCEPT
+    $IPTABLES -t mangle -A OUTPUT -o lo -j ACCEPT
+    echo "Firewall: done."
+}
+
+# load current configuration
+function do_start {
+    do_stop
+    if start_with_config ${opt_filter:+$opt_current/conf-$(uname -n).ipt}; then
+	if [ -n "$opt_forward" ]; then
+            echo "Firewall: enabling IP forwarding..."
+	    echo 1 > /proc/sys/net/ipv4/ip_forward
+	fi
+    fi
+    echo "Firewall: done."
+}
+
+# load backup configuration
+function do_revert {
+    do_stop
+    if start_with_config ${opt_filter:+$opt_backup/conf-$(uname -n).ipt}; then
+	if [ -n "$opt_forward" ]; then
+            echo "Firewall: enabling IP forwarding..."
+	    echo 1 > /proc/sys/net/ipv4/ip_forward
+	fi
+    fi
+    echo "Firewall: done."
+}
+
+# unload the firewall and enable ip forwarding
+function do_route {
+    do_stop
+    # enable ip forwarding
+    if [ -n "$opt_forward" ]; then
+        echo "Firewall: enabling IP forwarding..."
+        echo 1 > /proc/sys/net/ipv4/ip_forward
+    fi
+    echo "Firewall: done."
+}
+
+load_config
+

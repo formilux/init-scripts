@@ -1,0 +1,76 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	hostname	standard_option
+option	modprobe 	multiple_option
+option	sysctl		multiple_option
+option	file_max	standard_option
+
+function do_start {
+    local svcname=$1
+    local instname=$2
+    local arg
+
+    arg=0
+    while [ $arg -lt ${#opt_modprobe[*]} ]; do
+	modprobe ${opt_modprobe[$arg]} || return 1
+	arg=$[$arg+1]
+    done
+   
+    if [ "$opt_file_max" ]; then
+	echo $opt_file_max > /proc/sys/fs/file-max
+    fi
+   
+    if [ "$opt_hostname" ] ; then
+	echo "Setting hostname '$opt_hostname'"
+	echo ${opt_hostname%%.*} >/proc/sys/kernel/hostname
+	echo ${opt_hostname#*.} >/proc/sys/kernel/domainname
+    fi
+
+    for arg in ${opt_sysctl[*]}; do
+	local sysctl value
+	sysctl=${arg%%=*}
+	sysctl=${sysctl//.//}
+	value=${arg##*=}
+	if [ -e "/proc/sys/$sysctl" ]; then
+	    echo $value > /proc/sys/$sysctl
+	else
+	    echo "Non-existent sysctl entry : $arg"
+	fi
+    done
+    return 0
+}
+
+function do_status {
+    local instname=$2
+    echo "System status :"
+    echo -n "Hostname : "; hostname
+    echo "Modules list :"; lsmod
+    return 0
+}
+
+
+function do_stop {
+    local svcname=$1
+    local instname=$2
+
+    arg=${#opt_modprobe[*]}
+    while [ $arg -gt 0 ]; do
+	arg=$[$arg-1]
+	rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
+    done
+
+    return 0
+}
+
+function do_check {
+    local svcname=$1
+    local instname=$2
+    
+    read uptime idletime < /proc/uptime
+    echo "$HOSTNAME $svcname.$instname $(date +%s) RUNNING ${uptime%%.*} OK"
+}
+
+load_config
+

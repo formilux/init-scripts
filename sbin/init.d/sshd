@@ -1,0 +1,103 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+STOP_FIRST_WITH=KILL
+
+option	bin		reserved_option	/usr/sbin/sshd
+option	cmdline		reserved_option	'$bin ${opt_port:+-p $opt_port} ${opt_config:+-f $opt_config} ${opt_protocol:+-oProtocol=$opt_protocol} ${opt_listen:+-oListenAddress=$opt_listen} ${pidfile:+-oPidfile=$pidfile}'
+option	port		standard_option
+option	config		standard_option
+option	protocol	standard_option
+option	listen		standard_option
+option  pidfile		reserved_option /var/run/sshd.pid
+
+sshd_cfgfile=""
+
+# assign default values to options and variables before parsing the cfg file
+function fct_end_section {
+    sshd_cfgfile=${opt_config:-/etc/ssh/sshd_config}
+    valueof $sshd_cfgfile HostKey > /dev/null
+    hostkey_list=$REPLY
+    valueof $sshd_cfgfile PidFile > /dev/null ; pidfile=${REPLY:-$pidfile}
+}
+
+function sshd_find_keys {
+    if [ -z "$hostkey_list" ]; then
+	echo "  File $sshd_cfgfile references no key."
+	if [ -z "$opt_protocol" -o "${opt_protocol/1//}" != "$opt_protocol" ]; then
+	    echo "  Assuming /etc/ssh/ssh_host_key for Protocol v1."
+	    hostkey_list="$hostkey_list /etc/ssh/ssh_host_key"
+	fi
+	if [ -z "$opt_protocol" -o "${opt_protocol/2//}" != "${opt_protocol}" ]
+        then
+	    echo "  Assuming /etc/ssh/ssh_host_rsa_key for Protocol v2."
+	    hostkey_list="$hostkey_list /etc/ssh/ssh_host_rsa_key"
+	    echo "  Assuming /etc/ssh/ssh_host_dsa_key for Protocol v2."
+	    hostkey_list="$hostkey_list /etc/ssh/ssh_host_dsa_key"
+	fi
+    else
+	echo "  File $sshd_cfgfile references these keys : $hostkey_list"
+    fi
+}
+
+function fct_pre_start {
+    local missing=0
+    local key
+    local must_remount_ro=0
+
+    sshd_find_keys
+    for key in $hostkey_list; do
+	if [ ! -e "$key" ]; then
+	    echo "  Warning! host key $key does not exist."
+	    missing=$[$missing+1]
+	fi
+    done
+
+    if [ "$missing" -gt "0" ]; then
+	echo "  Trying to generate the keys before starting SSHD."
+	remount_rw /etc && must_remount_ro=1
+	do_install
+	[ $must_remount_ro -eq 1 ] && remount_ro /etc
+	echo "  Now starting SSHD."
+    fi
+}
+
+# This ensures that we use --force to restart the service
+function do_restart {
+    do_stop $*
+    FORCE_START_STOP=1
+    do_start $*
+}
+
+function do_install {
+    local type=""
+    local key
+
+    sshd_find_keys
+    for key in $hostkey_list; do
+	if [ ! -e "$key" ]; then
+	    case "$key" in
+		*/ssh_host_key*) type=rsa1 ;;
+		*/ssh_host_rsa_key*) type=rsa ;;
+		*/ssh_host_dsa_key*) type=dsa ;;
+		*) type=""
+		   echo "  Warning! host key $key does not exist and cannot"
+		   echo "  be auto-generated since it does not have a standard name."
+		   echo "  If SSHD doesn't start, you'll have to generate it manually this way :"
+		   echo "    # ssh-keygen -t { rsa1 | rsa | dsa } -N '' -f $key"
+		   echo
+		   ;;
+	    esac
+	    if [ "$type" ]; then
+		ssh-keygen -t $type -N '' -f $key
+		if [ ! -e "$key" ]; then
+		    echo "  ERROR : ssh-keygen could not generate $type host key $key"
+		fi
+	    fi
+	fi
+    done
+}
+
+load_config
+
