@@ -10,7 +10,6 @@ sbin/init.d/ntp
 sbin/init.d/squid
 sbin/init.d/sshd
 sbin/init.d/stat
-sbin/init.d/syslog-ng
 sbin/init.d/sysprofiles
 sbin/init.d/system
 sbin/init.d/thttpd
