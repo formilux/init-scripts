@@ -1,0 +1,37 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config		standard_option
+option	leasefile	standard_option
+option	device		multiple_option
+
+option	pidfile		reserved_option	/var/run/dhcpd.pid
+option	bin		reserved_option	/usr/sbin/dhcpd
+option	cmdline		reserved_option	'$bin ${opt_config:+-cf $opt_config} ${opt_leasedb:+-lf $opt_leasefile} ${opt_device[@]:+${opt_device[*]}}'
+
+# check that the lease file exists or the daemon will fail to start
+function fct_pre_start {
+    local leasefile
+
+    leasefile=${opt_leasefile:-/var/state/dhcp/dhcpd.leases}
+    if [ ! -e "$leasefile" ]; then
+	mkdir -m 0750 -p ${leasefile%/*} 2>/dev/null && chgrp adm ${leasefile%/*} 2>/dev/null
+	touch $leasefile
+    fi
+}
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|stop|help>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - config    : config file        ; def= ; cur=$opt_confdir"
+    echo "   - leasefile : lease file         ; def= ; cur=$opt_current"
+    echo "   - device    : list of interfaces ; def= ; cur=$opt_backup"
+    echo "   - pidfile   : path to file       ; def= ; cur=$pidfile"
+    echo
+    exit 1
+}
+
+load_config
+

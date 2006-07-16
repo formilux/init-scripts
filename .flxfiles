@@ -15,8 +15,11 @@ sbin/init.d/sysprofiles
 sbin/init.d/system
 sbin/init.d/thttpd
 sbin/init.d/pdnsd
-sbin/init.d/crond
 sbin/init.d/logrotate
+sbin/init.d/lpd
+sbin/init.d/inetd
+sbin/init.d/dhcpd
+sbin/init.d/sendmail
 sbin/rc.0
 sbin/rc.6
 sbin/rc.K

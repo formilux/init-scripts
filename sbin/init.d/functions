@@ -208,6 +208,33 @@ function remount_ro {
    fi
 }
 
+# this will try to unload module $1 and all modules which depend on it
+function recursive_rmmod {
+    local -a args
+    local mod
+
+    while : ; do
+	args=( $(/sbin/lsmod|grep "^$1 "|tr -d '\[\]') )
+	[ ${#args[@]} -gt 0 ] || return 0
+	if [ "${args[2]}" = "0" ]; then
+	    rmmod $1
+	    return $?
+	elif [ -z "${args[3]}" ]; then
+	    # use count >0, but nothing to unload
+	    return 1
+	else
+	    mod=3
+	    while [ $mod -lt ${#args[@]} ]; do
+		if ! recursive_rmmod ${args[$mod]}; then
+		    echo "Error: could not unload module ${args[$mod]}."
+		    return 1
+		fi
+		(( mod++ ))
+	    done
+	fi
+    done
+}
+
 ########################################
 # CONFIGURATION FILE LOADING FUNCTIONS #
 ########################################

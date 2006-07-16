@@ -1,0 +1,23 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config		standard_option
+
+option	pidfile		reserved_option	/var/run/inetd.pid
+option	bin		reserved_option	/usr/sbin/inetd
+option	cmdline		reserved_option	'$bin ${opt_config:+$opt_config}'
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|stop|help>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - config     : config file  ; def= ; cur=$opt_confdir"
+    echo "   - pidfile    : path to file ; def= ; cur=$pidfile"
+    echo
+    exit 1
+}
+
+
+load_config
+

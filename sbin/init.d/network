@@ -13,7 +13,15 @@
 #     [no] arp
 #     [no] multicast
 #     shutdown
-#     ip route <ip/mask> <gw>
+#     ip route <ip/mask> <gw> [ip args...]
+
+# we want ALL instances to stop and restart at once
+if [ "$1" = "restart" ]; then
+  shift
+  $0 stop  "$@"
+  $0 start "$@"
+  exit $?
+fi
 
 . `dirname $0`/functions
 
@@ -128,7 +136,7 @@ function do_start {
 	while [ $arg -lt $route_idx ]; do
 	    local dest gw
 	    dest=${route_list[$arg]%%[ 	]*}
-	    gw=${route_list[$arg]##*[ 	]}
+	    gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
 	    ip route add $dest via $gw
 	    arg=$[$arg+1]
 	done
@@ -172,17 +180,6 @@ function do_start {
     ip addr flush dev $instname >/dev/null 2>&1
     ip link set $instname down >/dev/null 2>&1
 
-    if [ "$opt_media" ]; then
-	if [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
-	    echo " ==> Warning: option 'media' inhibits 'speed','duplex' and 'auto'."
-	fi
-	set_media $instname "$opt_media"
-	echo "  ==> Link set to $opt_media for interface $instname"
-    elif [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
-	set_media2 $instname "${opt_speed:--}" "${opt_duplex:--}" "${opt_auto:--}"
-	echo "  ==> Link configuration changed for interface $instname"
-    fi
-
     if [ "$opt_lladdr" ]; then
 	ip link set $instname address $opt_lladdr
     fi
@@ -205,6 +202,18 @@ function do_start {
 	echo "  ==> start $svcname${instname:+[$instname]} : Failed."
 	return 1
     fi
+
+    if [ "$opt_media" ]; then
+	if [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
+	    echo " ==> Warning: option 'media' inhibits 'speed','duplex' and 'auto'."
+	fi
+	set_media $instname "$opt_media"
+	echo "  ==> Link set to $opt_media for interface $instname"
+    elif [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
+	set_media2 $instname "${opt_speed:--}" "${opt_duplex:--}" "${opt_auto:--}"
+	echo "  ==> Link configuration changed for interface $instname"
+    fi
+
     if [ ${#opt_slave[*]} -gt 0 ]; then
 	for arg in ${opt_slave[*]}; do
 	    if ! $PFULLNAME status $arg >/dev/null 2>&1; then
@@ -221,8 +230,14 @@ function do_start {
 	if [ "${addr_list[$arg]}" = "dhcp" ]; then
 	    echo "  ==> Waiting for ip address with DHCP request ... "
 	    dhcpcd -t 10 $instname
+	    set -- $(ip addr show dev $instname | grep ' inet ')
+	    if [ -n "$2" ]; then
+		echo "      Device $instname has IP address $2"
+	    else
+		echo "      Device $instname has no IP address"
+	    fi
 	else
-	    ip addr add ${addr_list[$arg]} dev $instname
+	    ip addr add dev $instname ${addr_list[$arg]}
 	fi
 	arg=$[$arg+1]
     done
@@ -231,8 +246,8 @@ function do_start {
     while [ $arg -lt $route_idx ]; do
 	local dest gw
 	dest=${route_list[$arg]%%[ 	]*}
-	gw=${route_list[$arg]##*[ 	]}
-	ip route add $dest via $gw dev $instname
+	gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
+	ip route add $dest dev $instname via $gw
 	arg=$[$arg+1]
     done
     echo "  ==> start $svcname${instname:+[$instname]} : Done."

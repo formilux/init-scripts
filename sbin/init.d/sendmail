@@ -1,0 +1,92 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+# config parameters
+# service sendmail
+#   bin <binary>
+#   cmdline <cmd>
+#   queuing <time_to_wait> 
+#   flags <additionnal command line flags>
+
+option	config		standard_option
+option	queuing		standard_option 15m
+option	flags		multiple_option
+option	bin		reserved_option /usr/sbin/sendmail
+option	cmdline		reserved_option '$bin -bd ${opt_config:+-C$opt_config} ${opt_queuing:+-q$opt_queuing} ${opt_flags[*]:+${opt_flags[*]}}'
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|update|install|help>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - config   : configuration file ; def=      ; cur=$opt_confdir"
+    echo "   - queing   : polling interval   ; def='15m' ; cur=$opt_current"
+    echo "   - flags    : command line flags ; def=      ; cur=$opt_backup"
+    echo
+    exit 1 
+}
+
+
+function do_install() {
+  echo "Creating sendmail environnement ... "
+  if [ ! -d /var/spool ] ; then
+    echo "  Aborting: directory '/var/spool' directory does not exist."
+    exit 1
+  else 
+    if [ ! -d /var/spool/clientmqueue ] ; then
+      mkdir -m 750 -p /var/spool/clientmqueue && \
+        chown smmsp:smmsp /var/spool/clientmqueue || exit 1
+    fi
+    if [ ! -d /var/spool/mail ] ; then
+      mkdir -m 751 -p /var/spool/mail && \
+        chown root:mail /var/spool/mail || exit 1
+    fi
+    if [ ! -d /var/spool/mqueue ] ; then
+      mkdir -m 700 -p /var/spool/mqueue && \
+        chown root:root /var/spool/mqueue || exit 1
+    fi 
+  fi
+  if [ ! -e /etc/mail/local-host-names ] ; then
+    mkdir -p /etc/mail
+    touch /etc/mail/local-host-names
+  fi
+  if [ ! -d /var/state/mail ] ; then
+    mkdir -p /var/state/mail
+  fi
+  do_update $*
+}
+
+function do_update {
+  local type filename
+  echo "Updating sendmail databases ... "
+
+  # updating /etc/mail/aliases.db file
+  if [ ! -e /etc/mail/aliases ] ; then touch /etc/mail/aliases ; fi
+  $bin -bi > /dev/null 2>&1
+
+  # get all defined maps
+  grep "^K[^ ]* \+\(dbm\|btree\|hash\) \+.*" ${opt_confid:-/etc/mail/sendmail.cf} | \
+     sed 's@^K[^ ]\+ \([^ ]\+\).* \([a-zA-Z0-9/-]\+\)@\1 \2@' | while read ; do 
+ 
+     set -- $REPLY
+     type=$1
+     filename=$2
+
+     # look for data file existance
+     if [ "x$filename" = "x" ] ; then continue ; fi
+     if [ ! -e "$filename" ] ; then touch $filename ; fi
+   
+     # look for known map type
+     case "$type" in 
+       dbm|btree|hash)
+         if [ ! -e $filename.db -o $filename -nt $filename.db ] ; then
+           makemap $type $filename.db < $filename
+           echo -n "$(basename $filename) "
+         fi
+         ;;
+     esac
+  done
+}
+
+load_config
+

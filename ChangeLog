@@ -1,3 +1,14 @@
+2003/06/22
+- ajout de dhcpd, inetd, lpd, sendmail
+- suppression de crond
+- correction de network pour supporter des paramètres à 'ip'
+- network gere le "restart" en une opération atomique
+- network : changement d'état du media après link up
+- deplacement de recursive_rmmod de firewall vers functions
+- firewall : si erreur de chargement, on passe en block
+- firewall : ajout de la commande 'reload' qui ne casse pas les sessions
+- network: en DHCP, on affiche l'adresse IP obtenue
+- release 0.3.17
 2003/06/20
 - encore une correction sur functions : les fonctions implémentant les options
   d'un service n'étaient plus désactivées avant d'appeler le service, donc

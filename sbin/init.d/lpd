@@ -1,0 +1,27 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	tcp		standard_option
+option	unix		standard_option
+option	remoteport	standard_option
+
+option	pidfile		reserved_option	/var/run/lpd.\${opt_tcp:-515}
+option	bin		reserved_option	/usr/sbin/lpd
+option	cmdline		reserved_option	'$bin ${opt_tcp:+-p $opt_tcp} ${opt_unix:+-P $opt_unix} ${opt_remoteport:+-R $opt_remoteport}'
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|stop|help>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - tcp        : port or 'off' ; def= ; cur=$opt_confdir"
+    echo "   - unix       : path or 'off' ; def= ; cur=$opt_current"
+    echo "   - remoteport : tcp port      ; def= ; cur=$opt_backup"
+    echo "   - pidfile    : path to file  ; def= ; cur=$pidfile"
+    echo
+    exit 1 
+}
+
+
+load_config
+
