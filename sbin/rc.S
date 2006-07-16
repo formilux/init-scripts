@@ -107,7 +107,7 @@ if touch /tmp/.$BOOTID >/dev/null 2>&1; then
 else
     echo "Mounting /tmp as tmpfs"
     umount /tmp >/dev/null 2>&1
-    mount -o mode=1777 -t tmpfs /tmp /tmp
+    mount -o mode=1777,nosuid,nodev -t tmpfs /tmp /tmp
     if [ $? != 0 ]; then
        echo "WARNING: could not mount /tmp as tmpfs."
        if [ -L /tmp ]; then
@@ -152,7 +152,7 @@ else
 
        # either it was a directory, or it now is.
        if [ -d /tmp ]; then
-          mount -o mode=1777 -t tmpfs /tmp /tmp && echo "  => Success !" || echo "  => FAILED ! /tmp is a directory but is unmountable !!! The system may be unstable"
+          mount -o mode=1777,nosuid,nodev -t tmpfs /tmp /tmp && echo "  => Success !" || echo "  => FAILED ! /tmp is a directory but is unmountable !!! The system may be unstable"
        fi
     fi
 fi

@@ -58,11 +58,11 @@ md /dev/fs 755
 
 # The partitions may be referenced here, so that
 # lilo.conf and fstab only use links.
-ln hda  /dev/mbr
-ln hda1 /dev/boot
-ln hda2 /dev/swap
-ln hda3 /dev/root
-ln ../hda6 /dev/fs/var
+#ln hda  /dev/mbr
+#ln hda1 /dev/boot
+#ln hda2 /dev/swap
+#ln hda3 /dev/root
+#ln ../hda6 /dev/fs/var
 
 in /sbin/init-sysv
 

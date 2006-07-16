@@ -1,3 +1,6 @@
+2003/06/24
+- nosuid,nodev sur /tmp dans rc.S
+- release 0.3.18
 2003/06/22
 - ajout de dhcpd, inetd, lpd, sendmail
 - suppression de crond
