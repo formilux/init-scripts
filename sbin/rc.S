@@ -93,7 +93,7 @@ if [ ! -d /var/run ] ; then mkdir /var/run ; fi
 if [ ! -d /var/state ] ; then mkdir /var/state ; fi
 if [ ! -d /var/lib ] ; then mkdir /var/lib ; fi
 if [ ! -d /var/spool ] ; then mkdir /var/spool ; fi
-if [ ! -d /var/log ] ; then mkdir /var/log ; chown root:log /var/log; chmod 2750 /var/log; fi
+if [ ! -d /var/log ] ; then mkdir /var/log ; chown root:log /var/log; chmod 2751 /var/log; fi
 if [ ! -d /var/cache ] ; then mkdir /var/cache ; fi
 if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 100 /var/empty; fi
 if [ ! -d /var/adm/. ] ; then ln -s log /var/adm ; fi
@@ -159,7 +159,7 @@ fi
 
 /bin/rm -f /var/run/utmp /var/run/*.pid >/dev/null 2>&1
 /bin/rm -rf /tmp/* /tmp/.[^.]* /tmp/..?* >/dev/null 2>&1
-touch /var/log/wtmp /var/log/lastlog
+touch /var/log/wtmp /var/run/utmp /var/log/lastlog
 
 #if mkdir /tmp/.$BOOTID ; then 
 #  dmesg > /tmp/.$BOOTID/dmesg

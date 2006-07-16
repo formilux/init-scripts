@@ -54,6 +54,9 @@ ch 0600 0 0 13 63 input/mice
 ln psaux /dev/mouse
 ln hdc /dev/cdrom
 
+md /dev/net 755
+ch 0600 0 0 10 200 /dev/net/tun
+
 md /dev/fs 755
 
 # The partitions may be referenced here, so that

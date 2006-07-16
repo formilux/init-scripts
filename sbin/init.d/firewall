@@ -12,6 +12,7 @@ option	filter		boolean_option	1
 option	stateful	boolean_option	1
 option	nat		boolean_option
 option	conntrack	option_conntrack
+option	modprobe	multiple_option
 
 IPTABLES=/sbin/iptables
 IPRESTORE=/sbin/iptables-restore
@@ -32,6 +33,7 @@ function do_help {
     echo "   - stateful : boolean ; def=1               ; cur=$opt_stateful"
     echo "   - nat      : boolean ; def=                ; cur=$opt_nat"
     echo "   - conntrack: var=val ; eg: max=1048576     ; cur='${conntrack_args[@]}'"
+    echo "   - modprobe : mod arg ; eg: ip_nat_ftp      ; cur='${opt_modprobe[@]}'"
     echo
     echo "The configuration file is $opt_confdir/$opt_current/conf-$(uname -n).ipt"
     echo
@@ -72,14 +74,17 @@ function load_modules {
     /sbin/modprobe iptable_mangle 2>/dev/null
 
     if ! grep -q "^filter$" /proc/net/ip_tables_names; then
+	echo "Error: filtering module did not load correctly."
 	unload_modules
 	return 1
     fi
 
     if [ -n "$opt_stateful" ]; then
     	/sbin/modprobe ip_conntrack hashsize=$opt_hashsize
-	if [ ! -e /proc/sys/net/ipv4/ip_conntrack_max -a \
-	     ! -e /proc/sys/net/ipv4/netfilter/ip_conntrack_max ]; then
+	if [ ! -e $sys1/ip_conntrack_max -a \
+	     ! -e $sys2/ip_conntrack_max ]; then
+	     echo "Error: conntrack module did not load correctly."
+	     echo "    -> Check 'stateful' and 'hashsize' options."
 	     unload_modules
 	     return 1
 	fi
@@ -97,6 +102,15 @@ function load_modules {
 	    fi
 	done
     fi
+
+    # now load all user-supplied modules
+    arg=0
+    while [ $arg -lt ${#opt_modprobe[*]} ]; do
+        if [ "${opt_modprobe[$arg]}" != "#" ]; then
+            /sbin/modprobe ${opt_modprobe[$arg]} || { echo "Warning: could not load module ${opt_modprobe[$arg]}"; return 1; }
+        fi
+        arg=$[$arg+1]
+    done
 
     return 0
 }
