@@ -9,6 +9,13 @@ option	procname	reserved_option	gpm
 option	cmdline		reserved_option	'$bin -t $opt_type -m $opt_device'
 option	pidfile		reserved_option	/var/run/gpm.pid
 
+# gpm is buggy, it doesn't close its std* before forking, so the startup
+# script hang at boot time because it hogs the terminal.
+function fct_pre_start {
+   #exec 10>&0 11>&1 12>&2
+   exec </dev/null >&0 2>&0
+}
+
 function fct_pre_stop {
    $cmdline -k >/dev/null 2>&1
 }

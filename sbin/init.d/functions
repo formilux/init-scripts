@@ -330,6 +330,8 @@ function do_stop_with_pidfile {
     if [ $FORCE_START_STOP -eq 0 ]; then
 	if ! [ -r "$pidfile" ] || ! read pid REPLY <"$pidfile" || ! [ -L /proc/$pid/cwd ]; then
 	    echo "# Process $pname${instname:+[$instname]} already stopped (according to $pidfile)${pids:+, but check pids : $pids}"
+	    # ensure that we remove stale files
+	    [ -e "$pidfile" ] && echo "Removing stale pid file" && rm -f "$pidfile"
 	    return 0
 	fi
     fi
@@ -342,9 +344,10 @@ function do_stop_with_pidfile {
  
     echo "# Stopping $pname${instname:+[$instname]} (pid $pid according to $pidfile) ..."
     declare -F fct_pre_stop >/dev/null && fct_pre_stop $pname $instname
-    kill -CONT $pid; kill -$STOP_FIRST_WITH $pid ; set -- 0 1 2 3
+    kill -CONT $pid >/dev/null 2>&1 ; kill -$STOP_FIRST_WITH $pid >/dev/null 2>&1
+    set -- 0 1 2 3
     while [ -L /proc/$pid/cwd -a $# -gt 0 ] ; do sleep $1 ; shift ; done
-    [ -L /proc/$pid/cwd ] && { kill -9 $pid ; sleep 1 ; }
+    [ -L /proc/$pid/cwd ] && { kill -9 $pid >/dev/null 2>&1; sleep 1 ; }
     [ -L /proc/$pid/cwd ] && { echo "  ==> stop $pname${instname:+[$instname]} Failed." ; return 1; }
     if [ -e "$pidfile" ]; then rm -f "$pidfile"; fi
     declare -F fct_post_stop >/dev/null && fct_post_stop $pname $instname
@@ -387,8 +390,8 @@ function do_stop {
     REPLY=$retry; retry=0
     while [ "$REPLY" ]; do
 	retry=$[$retry+1]
-	if [ $retry -le 3 ]; then kill -CONT $REPLY && kill -$STOP_FIRST_WITH $REPLY || break; sleep $retry
-	elif [ $retry -gt 3 ]; then kill -9 $REPLY || break; sleep 1
+	if [ $retry -le 3 ]; then kill -CONT $REPLY >/dev/null 2>&1 && kill -$STOP_FIRST_WITH $REPLY >/dev/null 2>&1 || break; sleep $retry
+	elif [ $retry -gt 3 ]; then kill -9 $REPLY >/dev/null 2>&1 || break; sleep 1
 	else break; fi
 	REPLY=`ps ho pid $REPLY`
     done

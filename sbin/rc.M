@@ -37,16 +37,18 @@ echo "Starting Multi-user (`date`)" | tee -a $LOG
 ip link set dev lo up
 ip addr add 127.0.0.1/8 dev lo
 
+# Cron should be moved to a proper service script
+
 # Starting 'crond' if exist
-if [ -x /usr/sbin/crond ] ; then
-  if [ ! -d /var/spool/cron/crontabs ] ; then mkdir -p /var/spool/cron/crontabs ; fi
-  crond
-fi
+#if [ -x /usr/sbin/crond ] ; then
+#  if [ ! -d /var/spool/cron/crontabs ] ; then mkdir -p /var/spool/cron/crontabs ; fi
+#  crond
+#fi
 
 # Starting 'atd' if exist
-if [ -x /usr/sbin/atd ] ; then
-  atd
-fi
+#if [ -x /usr/sbin/atd ] ; then
+#  atd
+#fi
 
 # Sourcing base configuration
 if [ -x /etc/startup.rc ] ; then
