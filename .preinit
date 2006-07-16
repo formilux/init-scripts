@@ -8,7 +8,7 @@ mt /proc /proc proc rw
 
 # we first try to mount /tmp as a tmpfs, next /var if it fails.
 mt /tmp /tmp tmpfs rw
-|mt /var /var tmpfs rw
+|mt /var /var tmpfs rw mode=755
 md /var/tmp 1777
 md /var/run 755
 md /dev/pts 755
@@ -35,7 +35,11 @@ bl 0600 0 0 7 0 loop[i,0-9,1]
 bl 0600 0 0 1 0 ram[i,0-9,1]
 ch 0600 0 5 4 64 ttyS[i,0-9,1]
 ch 0600 0 3 10 1 psaux
+ch 0600 0 0 10 144 nvram
+ch 0600 0 0 10 130 watchdog
 bl 0400 0 0 1 250 initrd
+ch 0600 0 0 14 0 mixer
+ch 0600 0 0 14 3 dsp
 md /dev/input 755
 ch 0600 0 0 13 63 input/mice
 

@@ -4,7 +4,7 @@
 
 option	type		standard_option	ps2
 option	device		standard_option	/dev/mouse
-option	bin		reserved_option	/sbin/gpm
+option	bin		reserved_option	/usr/sbin/gpm
 option	procname	reserved_option	gpm
 option	cmdline		reserved_option	'$bin -t $opt_type -m $opt_device'
 option	pidfile		reserved_option	/var/run/gpm.pid

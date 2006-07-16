@@ -1,3 +1,10 @@
+2003/02/18
+- correction de mouse : utilise /usr/sbin/gpm
+- rectification de rc.S : bash ne teste pas l'état R/W des filesystems, donc on
+  crée des fichiers temporaires. De plus, tentative coûte que coûte de créer /tmp.
+- dans rc.S, en cas d'erreur, on remonte tout en R/O au lieu du sulogin qui stoppe
+  le démarrage du système.
+- correction des droits de /var dans /.preinit + ajout de quelques entrées
 2003/02/09:
 - on peut maintenant lancer des services même si la section n'existe pas dans
   config.rc
