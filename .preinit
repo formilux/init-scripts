@@ -6,11 +6,11 @@
 # full, fd
 mt /proc /proc proc rw
 
-# we first try to mount /tmp as a tmpfs, next /var if it fails.
-mt /tmp /tmp tmpfs rw
-|mt /var /var tmpfs rw mode=755
-md /var/tmp 1777
-md /var/run 755
+# if we need /tmp now, let's first try to mount /tmp as a tmpfs, next /var if it fails.
+# mt /tmp /tmp tmpfs rw
+# |mt /var /var tmpfs rw mode=755
+# md /var/tmp 1777
+# md /var/run 755
 md /dev/pts 755
 
 bl 0600 0 0 3 0 hd[c,ab,64][I,0-16,1]
@@ -23,6 +23,9 @@ bl 0600 0 0 48 1 rd/c0d[i,0-31,8]p[i,1-7,1]
 md /dev/ida 755		# Compaq raid disks (majors 72-79)
 bl 0600 0 0 72 0 ida/c0d[i,0-15,16]
 bl 0600 0 0 72 1 ida/c0d[i,0-15,16]p[i,1-15,1]
+md /dev/cciss 755	# Compaq CCISS raid disks (major 104)
+bl 0600 0 0 104 0 cciss/c0d[i,0-15,16]
+bl 0600 0 0 104 1 cciss/c0d[i,0-15,16]p[i,1-15,1]
 bl 0600 0 0 11 0 sr[i,0-16,1]
 ch 0600 0 0 9 0 st[i,0-15,1]
 bl 0600 0 0 9 0 md[i,0-15,1]
@@ -34,9 +37,14 @@ ch 0600 0 5 4 1 tty[i,1-12,1]
 bl 0600 0 0 7 0 loop[i,0-9,1]
 bl 0600 0 0 1 0 ram[i,0-9,1]
 ch 0600 0 5 4 64 ttyS[i,0-9,1]
+ch 0600 0 0 108 0 ppp
 ch 0600 0 3 10 1 psaux
 ch 0600 0 0 10 144 nvram
 ch 0600 0 0 10 130 watchdog
+ch 0600 0 0 10 135 rtc
+ch 0600 0 0 10 156 lcd
+ch 0600 0 0 10 185 keypad
+ch 0600 0 0 10 186 smartcard
 bl 0400 0 0 1 250 initrd
 ch 0600 0 0 14 0 mixer
 ch 0600 0 0 14 3 dsp
@@ -48,7 +56,7 @@ ln hdc /dev/cdrom
 
 md /dev/fs 755
 
-# The partitions are referenced here, so that
+# The partitions may be referenced here, so that
 # lilo.conf and fstab only use links.
 ln hda  /dev/mbr
 ln hda1 /dev/boot
