@@ -10,7 +10,7 @@ option	port		standard_option
 option	config		standard_option
 option	protocol	standard_option
 option	listen		standard_option
-option  pidfile		reserved_option /var/run/sshd
+option  pidfile		reserved_option /var/run/sshd.pid
 
 sshd_cfgfile=""
 
@@ -61,6 +61,13 @@ function fct_pre_start {
 	[ $must_remount_ro -eq 1 ] && remount_ro /etc
 	echo "  Now starting SSHD."
     fi
+}
+
+# This ensures that we use --force to restart the service
+function do_restart {
+    do_stop $*
+    FORCE_START_STOP=1
+    do_start $*
 }
 
 function do_install {
