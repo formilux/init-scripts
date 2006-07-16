@@ -5,11 +5,12 @@
 STOP_FIRST_WITH=KILL
 
 option	bin		reserved_option	/usr/sbin/sshd
-option	cmdline		reserved_option	'$bin ${opt_port:+-p $opt_port} ${opt_config:+-f $opt_config} ${opt_protocol:+-oProtocol=$opt_protocol} ${opt_listen:+-oListenAddress=$opt_listen}'
+option	cmdline		reserved_option	'$bin ${opt_port:+-p $opt_port} ${opt_config:+-f $opt_config} ${opt_protocol:+-oProtocol=$opt_protocol} ${opt_listen:+-oListenAddress=$opt_listen} ${pidfile:+-oPidfile=$pidfile}'
 option	port		standard_option
 option	config		standard_option
 option	protocol	standard_option
 option	listen		standard_option
+option  pidfile		reserved_option /var/run/sshd
 
 sshd_cfgfile=""
 
