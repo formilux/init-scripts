@@ -1,5 +1,13 @@
 #!/bin/bash
 
+#
+# sbin/init.d/functions - Formilux init script - version 0.3.9 - 2003-06-05
+#
+# Copyright (C) 2001-2003 Benoit Dolez & Willy Tarreau
+#       mailto: benoit@ant-computing.com,willy@ant-computing.com
+#
+# This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
+
 # not used ? ## DEBUG FILE
 # not used ? #DEBUG=/tmp/.flx.$PID.$RANDOM
 # not used ? #[ -e "$DEBUG" ] && rm -f $DEBUG && touch $DEBUG
@@ -85,11 +93,12 @@ function logit {
 
 # returns the value for a given parameter in a config file. The value is both
 # echoed and set to the REPLY variable.
+# The value is found this way :
+# [ \t]*<parameter>[:= \t]*<value>[#]*<comment>$
+
 # usage: valueof CONFIGFILE PARAMETER
 function valueof {
-    REPLY=$( awk 'BEGIN { FS="[:= \\t]+"} {gsub("#.*", "", $0); \
-		if (match($1, "^'$2'$")) { \
-		    gsub("^[:= \\t]*'$2'[:= \\t]+", "", $0); print $0 } }' $1 )
+    REPLY=$(grep $'^[ \t]*'"$2"'[:= \t]*' $1|sed s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,')
     echo $REPLY
 }
 
@@ -836,6 +845,12 @@ function load_config {
     return $STATUS_RET
 }
 
+# abort the process after displaying an error message.
+die() {
+    echo $* >&2
+    exit 1
+}
+
 ##################################
 #   ALWAYS LOADED WHEN SOURCED   #
 ##################################
@@ -851,15 +866,15 @@ while [ $# -gt 0 ] ; do
     case "$1" in
     -f|--file)	# use this configuration file
 	export CONFIG=$2
-	shift 2
+	shift 2 || die "Error: missing arg for --file, try --help."
 	;;
     --auto)	# only start services which don't have a "no autostart" statement
 	SVC_AUTO_START=1
-	shift 1
+	shift
 	;;
     --force)	# force start or stop disregarding current status
 	FORCE_START_STOP=1
-	shift 1
+	shift
 	;;
     --list_sections)	# list all known sections
 	MUST_LIST_SECTIONS=1
@@ -868,13 +883,14 @@ while [ $# -gt 0 ] ; do
 	;;
     --filter_option)	# display only this option in list_options
 	OPTION_FILTER=$2
-	shift 2
+	shift 2 || die "Error: missing arg for --filter_option, try --help."
 	;;
-   -o|--option)		# force options : -o "opt=val,opt=val..."
+    -o|--option)	# force options : -o "opt=val,opt=val..."
 	FORCE_OPTIONS=$2
-	shift 2
+	shift 2 || die "Error: missing arg for --option, try --help."
 	;;
     -*)
+	echo "Common commands : start, stop, restart, status, check, list_options."
 	echo "Global options :"
 	grep $'^[ \t]*-[-a-z0-9_|]*)[ \t]*# ' $PPATH/functions | \
 	    sed -e $'s/^\\([ \t]*\\)\\([^)]*\\)\\([ \t#)]*\\)\\(.*\\)/    \\2\t\t\\4/'

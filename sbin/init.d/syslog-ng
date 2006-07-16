@@ -3,25 +3,30 @@
 . `dirname $0`/functions
 
 option	config		standard_option	/etc/syslog-ng/syslog-ng.conf
+option	nice		standard_option	0
+option	chain		standard_option
 option	pidfile		reserved_option	/var/run/syslog-ng.pid
 
 option	bin		reserved_option	/sbin/syslog-ng
-option	cmdline		reserved_option	'$bin -f $opt_config -p $pidfile'
+option	cmdline		reserved_option	'nice -n $opt_nice $bin -f $opt_config -p $pidfile'
 
-# perform a forced synchronisation before starting the daemon
+# we might want to start klogd right after syslog-ng
 function fct_post_start {
-    /sbin/init.d/klogd start >/dev/null 2>&1 || echo "Error starting klogd."
+    if [ -n "$opt_chain" ]; then
+	/sbin/init.d/$opt_chain start >/dev/null 2>&1 || echo "Error starting $opt_chain."
+    fi
 }
 
-# perform a forced synchronisation before stopping the daemon
 function fct_pre_stop {
-    /sbin/init.d/klogd stop >/dev/null 2>&1 || echo "Error stopping klogd."
+    if [ -n "$opt_chain" ]; then
+        /sbin/init.d/$opt_chain stop >/dev/null 2>&1 || echo "Error stopping $opt_chain."
+    fi
 }
 
 function do_update {
     if [ -e $pidfile ] ; then 
         read < $pidfile 
-        [ "$pidfile" ] && kill -HUP $REPLY > /dev/null 2>&1
+        [ "$REPLY" ] && kill -HUP $REPLY > /dev/null 2>&1
     fi
 }
 

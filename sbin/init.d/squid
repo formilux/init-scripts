@@ -1,0 +1,43 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config		standard_option /etc/opt/squid/squid.conf
+option	httpport	standard_option
+option	icpport		standard_option
+option	usesyslog	boolean_option 0
+option	createswap	boolean_option 0
+option	catchsignals	boolean_option 1
+option	dnstest		boolean_option 1
+option	waitrebuild	boolean_option 0
+option	reuseaddr	boolean_option 1
+option	doublecheck	boolean_option 0
+option	vhostaccel	boolean_option 0
+option	bin		reserved_option	/opt/sbin/squid
+
+function fct_end_section {
+    local chroot
+    # try to find pidfile from the config file if unspecified
+    if [ -z "$pidfile" ]; then
+        valueof ${opt_config:-/etc/opt/squid/squid.conf} chroot >/dev/null 2>&1
+        chroot=$REPLY
+        valueof ${opt_config:-/etc/opt/squid/squid.conf} pid_filename >/dev/null 2>&1
+        pidfile=$chroot/${REPLY:-/var/log/squid.pid}
+        pidfile=${pidfile//\/\//\/}	# clear double slashes
+    fi
+
+    # let's add the options to the command line
+    cmdline="$cmdline ${opt_config:+-f $opt_config} ${opt_httpport:+-a $opt_httpport}"
+    cmdline="$cmdline ${opt_icpport:+-u $opt_icpport}"
+    [ "$opt_usesyslog" = "1" ] && cmdline="$cmdline -s"
+    [ "$opt_createswap" = "1" ] && cmdline="$cmdline -z"
+    [ "$opt_catchsignals" != "1" ] && cmdline="$cmdline -C"
+    [ "$opt_dnstest" != "1" ] && cmdline="$cmdline -D"
+    [ "$opt_reuseaddr" != "1" ] && cmdline="$cmdline -R"
+    [ "$opt_waitrebuild" = "1" ] && cmdline="$cmdline -F"
+    [ "$opt_doublecheck" = "1" ] && cmdline="$cmdline -S"
+    [ "$opt_vhostaccel" = "1" ] && cmdline="$cmdline -V"
+}
+
+load_config
+
