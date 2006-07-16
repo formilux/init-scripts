@@ -9,11 +9,67 @@ option	file_max	standard_option
 option	rtc		standard_option	"local"		# "local", "utc", "disabled"
 option	rtc_mode	standard_option	"direct"	# "direct", "kernel"
 
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|stop|date_to_hw|date_from_hw|help>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - hostname : string  ;                    ; cur=$opt_hostname"
+    echo "   - modprobe : mod arg ; eg: usb-ohci       ; cur='${opt_modprobe[@]}'"
+    echo "   - sysctl   : var=val ; eg: kernel.sysrq=0 ; cur='${opt_sysctl[@]}'"
+    echo "   - filemax  : integer ;                    ; cur=$opt_filemax"
+    echo "   - rtc      : local|utc|disabled ;   local ; cur=$opt_rtc"
+    echo "   - rtc_mode : direct|kernel      ;  direct ; cur=$opt_rtc_mode"
+    echo
+    exit 1 
+}
+
+# gets system date from hardware clock
+function do_date_from_hw {
+    local rtc_opt=""
+
+    # this is necessary because some PCs (eg: siemens) hang otherwise.
+    if [ "$opt_rtc_mode" = "direct" ]; then
+	rtc_opt="$rtc_opt --directisa"
+    fi
+
+    if [ "$opt_rtc" = "utc" ]; then
+	echo -n "Setting system time from hardware clock (UTC)... "
+	hwclock --hctosys --noadjfile --utc $rtc_opt
+	echo "Done."
+    elif [ "$opt_rtc" = "local" ]; then
+	echo -n "Setting system time from hardware clock (Local time)... "
+	hwclock --hctosys --noadjfile --localtime $rtc_opt
+	echo "Done."
+    fi
+    return 0
+}
+
+# saves current date to hardware clock
+function do_date_to_hw {
+    local rtc_opt=""
+
+    # this is necessary because some PCs (eg: siemens) hang otherwise.
+    if [ "$opt_rtc_mode" = "direct" ]; then
+	rtc_opt="$rtc_opt --directisa"
+    fi
+
+    if [ "$opt_rtc" = "utc" ]; then
+	echo -n "Saving system time to hardware clock (UTC)... "
+	hwclock --systohc --noadjfile --utc $rtc_opt
+	echo "Done."
+    elif [ "$opt_rtc" = "local" ]; then
+	echo -n "Saving system time to hardware clock (Local time)... "
+	hwclock --systohc --noadjfile --localtime $rtc_opt
+	echo "Done."
+    fi
+    return 0
+}
+
 function do_start {
     local svcname=$1
     local instname=$2
     local arg
-    local rtc_opt=""
 
     arg=0
     while [ $arg -lt ${#opt_modprobe[*]} ]; do
@@ -31,20 +87,7 @@ function do_start {
 	echo ${opt_hostname#*.} >/proc/sys/kernel/domainname
     fi
 
-    # this is necessary because some PCs (eg: siemens) hang otherwise.
-    if [ "$opt_rtc_mode" = "direct" ]; then
-	rtc_opt="$rtc_opt --directisa"
-    fi
-
-    if [ "$opt_rtc" = "utc" ]; then
-	echo -n "Setting system time from hardware clock (UTC)... "
-	hwclock --hctosys --noadjfile --utc $rtc_opt
-	echo "Done."
-    elif [ "$opt_rtc" = "local" ]; then
-	echo -n "Setting system time from hardware clock (Local time)... "
-	hwclock --hctosys --noadjfile --localtime $rtc_opt
-	echo "Done."
-    fi
+    do_date_from_hw
 
     for arg in ${opt_sysctl[*]}; do
 	local sysctl value
@@ -68,7 +111,6 @@ function do_status {
     return 0
 }
 
-
 function do_stop {
     local svcname=$1
     local instname=$2
@@ -77,24 +119,10 @@ function do_stop {
     arg=${#opt_modprobe[*]}
     while [ $arg -gt 0 ]; do
 	arg=$[$arg-1]
-	rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
+	recursive_rmmod ${opt_modprobe[$arg]} >/dev/null 2>&1
     done
 
-    # this is necessary because some PCs (eg: siemens) hang otherwise.
-    if [ "$opt_rtc_mode" = "direct" ]; then
-	rtc_opt="$rtc_opt --directisa"
-    fi
-
-    if [ "$opt_rtc" = "utc" ]; then
-	echo -n "Saving system time to hardware clock (UTC)... "
-	hwclock --systohc --noadjfile --utc $rtc_opt
-	echo "Done."
-    elif [ "$opt_rtc" = "local" ]; then
-	echo -n "Saving system time to hardware clock (Local time)... "
-	hwclock --systohc --noadjfile --localtime $rtc_opt
-	echo "Done."
-    fi
-
+    do_date_to_hw
     return 0
 }
 

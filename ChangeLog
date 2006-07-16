@@ -1,3 +1,8 @@
+2003/11/11 : 0.3.26
+- functions : fixed stupid bug with uninitialized variable in list_options
+- system    : added a help function
+- system    : added 2 functions date_to_hw & date_from_hw to sync clocks
+- system    : do_stop now uses recursive_rmmod
 2003/10/26 : 0.3.25
 - network : now supports a "vrrp" option which is only used by external scripts.
 - squid   : fix squidguard handling

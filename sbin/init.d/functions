@@ -583,6 +583,7 @@ function do_list_options {
 		    eval eval echo $inst ${svc_opts[$i]} \$"${svc_vars[$i]}"
 	    elif [ "${svc_fcts[$i]}" = "multiple_option" ]; then
 		eval nbocc='${#'"${svc_vars[$i]}"'[*]}'
+		occur=0
 		if [ $nbocc -eq 0 ]; then # no value, let's at least show the option name
 		    eval echo $inst ${svc_opts[$i]}
 		else
