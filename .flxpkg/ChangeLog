@@ -1,0 +1,46 @@
+2006/02/02 11:00  willy@wtap
+
+	* released init-scripts-0.3.35-flx0.1
+	* the network script can now set the hostname via DHCP and waits
+	  1 second for the link to set up when needed before the DHCP request.
+	* the 'daemon' function no longer closes stdin/stdout, but rather
+	  redirects them to /dev/null in order to avoid stupid daemons such
+	  as cron to pass closed fds to the services they call !
+
+2004/12/14 14:12  willy@wtap
+
+	* released init-scripts-0.3.34-flx0.1
+	* the firewall script now accepts to load anonymous files
+
+2004/05/31 21:40  willy@wtap
+
+	* released init-scripts-0.3.33-flx0.1
+	* fixed 2 typos introduced in 'network' script in 0.3.32
+	* changed keyword '-' to 'connected' for local routes in 'network'
+
+2004/05/30 20:23  willy@wtap
+
+	* released init-scripts-0.3.32-flx0.1
+	* added a line with "/sbin/wdd" in 'startup.rc'
+	* fixed path to /sbin/rmmod in 'functions' (needed by cron)
+	* 'network' now starts 'lo' even if it is already up (allows
+	  multiple addresses), can execute a command at load/unload time,
+	  and now accepts local routes without gateways (using '-' instead
+	  of the gateway)
+
+2004/03/12 00:16  willy@wtap
+
+	* released init-scripts-0.3.31-flx0.1
+	* fixed a load error in the firewall script with forwarding disabled
+	* fixed an infinite loop bug in recursive_rmmod()
+	* added quick workaround for echelogd which does not close its FDs.
+
+2004/02/24 21:36  willy@wtap
+
+	* released init-scripts-0.3.30-flx0.1
+	* removed unused ntp and squid scripts
+	* linked /etc/init.d to /sbin/init.d
+	* system now allows module loading to fail
+	* network works around a kernel bug by setting a
+	  link down before flushing addresses during stop.
+	
