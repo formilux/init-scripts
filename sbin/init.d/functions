@@ -663,6 +663,7 @@ function default_service {
 	    esac
 	done
 
+	declare -F set_vars > /dev/null && set_vars
 	# force a last eval on each reserved option so that they can refer to
 	# each other.
 	for i in bin pidfile procname cmdline; do eval eval "$i=\\\"\$$i\\\""; done

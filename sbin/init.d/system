@@ -6,12 +6,14 @@ option	hostname	standard_option
 option	modprobe 	multiple_option
 option	sysctl		multiple_option
 option	file_max	standard_option
-option	rtc		standard_option	"local"
+option	rtc		standard_option	"local"		# "local", "utc", "disabled"
+option	rtc_mode	standard_option	"direct"	# "direct", "kernel"
 
 function do_start {
     local svcname=$1
     local instname=$2
     local arg
+    local rtc_opt=""
 
     arg=0
     while [ $arg -lt ${#opt_modprobe[*]} ]; do
@@ -29,15 +31,21 @@ function do_start {
 	echo ${opt_hostname#*.} >/proc/sys/kernel/domainname
     fi
 
+    # this is necessary because some PCs (eg: siemens) hang otherwise.
+    if [ "$opt_rtc_mode" = "direct" ]; then
+	rtc_opt="$rtc_opt --directisa"
+    fi
+
     if [ "$opt_rtc" = "utc" ]; then
 	echo -n "Setting system time from hardware clock (UTC)... "
-	hwclock --hctosys --utc
+	hwclock --hctosys --utc $rtc_opt
 	echo "Done."
     elif [ "$opt_rtc" = "local" ]; then
 	echo -n "Setting system time from hardware clock (Local time)... "
-	hwclock --hctosys --localtime
+	hwclock --hctosys --localtime $rtc_opt
 	echo "Done."
     fi
+
     for arg in ${opt_sysctl[*]}; do
 	local sysctl value
 	sysctl=${arg%%=*}

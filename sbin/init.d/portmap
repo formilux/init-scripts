@@ -1,0 +1,13 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	bin		reserved_option	/usr/sbin/portmap
+
+function fct_pre_start {
+   # portmap dies if >1024 fds are available !
+   ulimit -n 1024
+}
+
+load_config
+

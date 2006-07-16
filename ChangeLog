@@ -1,3 +1,10 @@
+2003/08/11
+- script system: hwclock accède désormais au bus ISA par défaut
+- ajout de "rtc_mode" au script system pour forcer le passage par
+  le kernel
+- ajout temporaire de portmap
+- appel de set_vars dans functions
+- release 0.3.21
 2003/07/22
 - hwclock implémenté dans script system et supprimé de NTP
 - correction de l'autonégociation dans network
