@@ -22,6 +22,11 @@ if [ "$1" = "restart" ]; then
   $0 stop  "$@"
   $0 start "$@"
   exit $?
+elif [ "$1" = "reload" ]; then
+  shift
+  $0 flush "$@"
+  $0 start "$@"
+  exit $?
 fi
 
 . `dirname $0`/functions
@@ -40,7 +45,26 @@ option	multicast	boolean_option	1
 option	shutdown	boolean_option
 option	vrrp	 	multiple_option
 
-SVC_VARS="addr_list route_list addr_idx route_idx"
+SVC_VARS="addr_list route_list arp_list addr_idx route_idx arp_idx"
+
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|stop|flush|reload|help>"
+    echo "List of config.rc options (name, type, default value, current value) :"
+    echo
+    echo "   - ip addr <address>, arp <ip> <mac>|pub, dhcp, route <dest> <gw> [<args>]"
+    echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx}"
+    echo "   - duplex {half|full}"
+    echo "   - speed  {10|100|1000}"
+    echo "   - auto   {on|off}"
+    echo "   - slave  <interface*>"
+    echo "   - modprobe <module> <arg*>"
+    echo "   - lladdr <mac_addr>"
+    echo "   - mtu <mtu> ; arp {on|off} ; multicast {on|off} ; shutdown"
+    echo "   - vrrp <id|prio|addr|auth_type|pass|garp>"
+    echo
+    exit 1 
+}
 
 # changes the negociation parameters for interface $1
 # usage: set_media <interface> <media>
@@ -88,8 +112,10 @@ function set_media2 {
 
 function fct_begin_section {
     addr_list=( )
+    arp_list=( )
     route_list=( )
     addr_idx=0
+    arp_idx=0
     route_idx=0
 }
 
@@ -102,6 +128,10 @@ function option_ip {
 	addr|address)
 	    addr_list[$addr_idx]="$*"
 	    addr_idx=$[$addr_idx+1]
+	    ;;
+	arp|neigh*)
+	    arp_list[$arp_idx]="$*"
+	    arp_idx=$[$arp_idx+1]
 	    ;;
 	route)
 	    route_list[$route_idx]="$*"
@@ -132,7 +162,9 @@ function do_start {
 	arg=0
 	while [ $arg -lt ${#opt_modprobe[*]} ]; do
 	    if [ "${opt_modprobe[$arg]}" != "#" ]; then
-		modprobe ${opt_modprobe[$arg]} || return 1
+		if ! modprobe ${opt_modprobe[$arg]}; then
+		    echo "  ==> start $svcname : modprobe ${opt_modprobe[$arg]} failed. Trying anyway."
+		fi
 	    fi
 	    arg=$[$arg+1]
 	done
@@ -165,16 +197,16 @@ function do_start {
     while [ $arg -lt ${#opt_modprobe[*]} ]; do
 	if [ "${opt_modprobe[$arg]}" != "#" ]; then
 	    if ! modprobe ${opt_modprobe[$arg]}; then
-		echo "  ==> start $svcname${instname:+[$instname]} : modprobe ${opt_modprobe[$arg]} Failed."
-		return 1
+		echo "  ==> start $svcname${instname:+[$instname]} : modprobe ${opt_modprobe[$arg]} failed. Trying anyway."
+		# return 1
 	    fi
 	else
 	    local err	# do not merge the assignment here, local sets $? to 0 !
 	    err=`modprobe $instname 2>&1`
 	    if [ $? -gt 0 ]; then
 		if ! grep -q "^[ 	]*$instname:" /proc/net/dev >/dev/null 2>&1; then
-		    echo "  ==> modprobe $instname failed : $err"
-		    return 1
+		    echo "  ==> start $svcname[$instname] : modprobe $instname failed : $err. Trying anyway."
+		    # return 1
 		fi
 	    fi
 	fi
@@ -256,6 +288,24 @@ function do_start {
 	    fi
 	else
 	    ip addr add dev $instname ${addr_list[$arg]}
+	fi
+	arg=$[$arg+1]
+    done
+
+    arg=0
+    while [ $arg -lt $arp_idx ]; do
+	local ip mac
+	ip=${arp_list[$arg]%%[ 	]*}
+	mac=${arp_list[$arg]#*[ 	]}
+
+	# delete annoying pub entries if it exists. We don't use ip neigh here
+	# because it cannot create anything if an incomplete entry exists.
+	arp -i $instname -d $ip pub >/dev/null 2>&1
+
+	if [ "$mac" = "pub" ]; then
+	    arp -i $instname -Ds $ip $instname pub
+	else
+	    arp -i $instname -s $ip $mac
 	fi
 	arg=$[$arg+1]
     done
@@ -357,6 +407,56 @@ function do_stop {
 	fi
     done
     echo "  ==> stop $svcname${instname:+[$instname]} : Done."
+}
+
+
+# only flushes addresses, routes routes and sets if down. doesn't remove any module
+function do_flush {
+    local svcname=$1
+    local instname=$2
+    local arg
+
+    if [ -z "$instname" ]; then
+	echo "# Flushing $svcname ..."
+
+	arg=0
+	while [ $arg -lt $route_idx ]; do
+	    ip route del ${route_list[$arg]} >/dev/null 2>&1
+	    arg=$[$arg+1]
+	done
+	return $?
+    fi
+
+    echo "# Flushing $svcname${instname:+[$instname]} ..."
+
+    if ! do_status $svcname $instname > /dev/null 2>&1; then
+	# vlan interfaces must disappear
+	if [ -n "${instname//*.*/}" ] || ! ip link show $instname >/dev/null 2>&1; then
+	    echo "  ==> flush $svcname${instname:+[$instname]} : already flushed."
+	    return 0
+        fi
+    fi
+
+    # we may have to kill dhcpcd
+    arg=0
+    while [ $arg -lt $addr_idx ]; do
+	if [ "${addr_list[$arg]}" = "dhcp" ]; then
+	    local proc
+	    for proc in $(svc_pidof dhcpcd) ; do 
+		if grep -qs $instname /proc/$proc/cmdline ; then kill $proc ; fi
+	    done   
+	fi
+	arg=$[$arg+1]
+    done
+
+    ip addr flush dev $instname >/dev/null 2>&1
+    ip link set $instname down >/dev/null 2>&1
+
+    # a dot in an interface name means physical_if.vlanid
+    # We have to remove the interface now.
+    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null
+
+    echo "  ==> flush $svcname${instname:+[$instname]} : Done."
 }
 
 #### these are the old versions. The slave mechanism should be checked.

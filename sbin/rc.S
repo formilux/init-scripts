@@ -1,5 +1,31 @@
 #!/bin/sh
 
+function build_var {
+  # check whether /var is already mounted read-write. If not, we'll do
+  # it because it's unacceptable to work in read-only mode !
+  if touch /var/.$BOOTID >/dev/null 2>&1; then
+    rm -f /var/.$BOOTID >/dev/null 2>&1
+  else
+    echo
+    echo "WARNING: Mounting /var as tmpfs !"
+    umount /var >/dev/null 2>&1
+    mount -o mode=755 -t tmpfs /var /var
+  fi
+
+  # Create /var directories if they don't exist
+  if [ ! -d /var/tmp ] ; then mkdir -m 1777 /var/tmp ; fi
+  if [ ! -d /var/run ] ; then mkdir /var/run ; fi
+  if [ ! -d /var/state ] ; then mkdir /var/state ; fi
+  if [ ! -d /var/lib ] ; then mkdir /var/lib ; fi
+  if [ ! -d /var/spool ] ; then mkdir /var/spool ; fi
+  if [ ! -d /var/log ] ; then mkdir /var/log ; chown root:log /var/log; chmod 2751 /var/log; fi
+  if [ ! -d /var/cache ] ; then mkdir /var/cache ; fi
+  if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 100 /var/empty; fi
+  if [ ! -d /var/adm/. ] ; then ln -s log /var/adm ; fi
+
+  sync
+}
+
 umask 022
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
@@ -73,32 +99,28 @@ if [ $? -gt 1 ] ; then
 else
   # mount file systems in fstab (and create an entry for /)
   # but not NFS because TCP/IP is not yet configured
-  mount -nat nonfs,noproc
+  mount -nafvt nonfs,noproc 2>/dev/null|grep '^/'| while read dev ON dir rest;do
+    echo -n "Mounting $dev on $dir... "
+    if [ ! -d "$dir" ]; then
+      subdir=${dir%/*}
+      while ! mkdir -p "$dir" 2>/dev/null && [ -n "$subdir" ]; do
+        if grep -q "^/[^ ]* $subdir " /proc/mounts; then
+          mount -wo remount "$subdir"
+          mkdir -p "$dir" 2>/dev/null
+          break
+        elif [ "$subdir" = "/var" ]; then
+          # we can do it now because we're now certain that
+	  # no other file-system will handle it
+	  build_var
+        fi
+	subdir=${subdir%/*}
+      done
+    fi
+    mount -n $dir && echo "done."
+  done
 fi
 
-
-# check whether /var is already mounted read-write. If not, we'll do
-# it because it's unacceptable to work in read-only mode !
-if touch /var/.$BOOTID >/dev/null 2>&1; then
-    rm -f /var/.$BOOTID >/dev/null 2>&1
-else
-    echo "WARNING: Mounting /var as tmpfs !"
-    umount /var >/dev/null 2>&1
-    mount -o mode=755 -t tmpfs /var /var
-fi
-
-# Create /var directories if they don't exist
-if [ ! -d /var/tmp ] ; then mkdir -m 1777 /var/tmp ; fi
-if [ ! -d /var/run ] ; then mkdir /var/run ; fi
-if [ ! -d /var/state ] ; then mkdir /var/state ; fi
-if [ ! -d /var/lib ] ; then mkdir /var/lib ; fi
-if [ ! -d /var/spool ] ; then mkdir /var/spool ; fi
-if [ ! -d /var/log ] ; then mkdir /var/log ; chown root:log /var/log; chmod 2751 /var/log; fi
-if [ ! -d /var/cache ] ; then mkdir /var/cache ; fi
-if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 100 /var/empty; fi
-if [ ! -d /var/adm/. ] ; then ln -s log /var/adm ; fi
-
-sync
+build_var
 
 # check whether /tmp is already mounted read-write. If not, we'll do
 # it because it's unacceptable to work in read-only mode !
