@@ -1,3 +1,8 @@
+2003/06/20
+- encore une correction sur functions : les fonctions implémentant les options
+  d'un service n'étaient plus désactivées avant d'appeler le service, donc
+  des modprobe et/ou nice pouvaient être ignorées.
+- release de la 0.3.16
 2003/06/19
 - correction d'un bug dans functions : lors de l'évaluation d'un service,
   toutes les options des autres services n'étaient pas invalidées, ce qui

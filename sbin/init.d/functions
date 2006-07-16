@@ -629,9 +629,9 @@ function default_service {
 	done
 
 	# unset all options to avoid conflicts with commands (eg: modprobe, ip ...)
-	for i in $DEFINED_FUNCTIONS; do
+	for i in $DEFINED_FUNCTIONS ${svc_opts[*]}; do
 	    case "$i" in
-		service|section|interface) ;;
+		no|service|section|interface) ;;
 		*) unset -f $i ;;
 	    esac
 	done
@@ -678,7 +678,7 @@ function default_service {
 	# reset all options to the default option
 	for i in $DEFINED_FUNCTIONS; do
 	    case "$i" in
-		service|section|interface) ;;
+		no|service|section|interface) ;;
 		*) unset -f $i
 		   eval "function $i { default_config_option $i \$* ; } "
 		   ;;
