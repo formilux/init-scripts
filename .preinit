@@ -7,7 +7,7 @@
 mt /proc /proc proc rw
 
 # if we need /tmp now, let's first try to mount /tmp as a tmpfs, next /var if it fails.
-# mt /tmp /tmp tmpfs rw
+# mt /tmp /tmp tmpfs rw mode=1777,nosuid,nodev
 # |mt /var /var tmpfs rw mode=755
 # md /var/tmp 1777
 # md /var/run 755

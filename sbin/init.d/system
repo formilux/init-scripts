@@ -6,6 +6,7 @@ option	hostname	standard_option
 option	modprobe 	multiple_option
 option	sysctl		multiple_option
 option	file_max	standard_option
+option	rtc		standard_option	"utc"
 
 function do_start {
     local svcname=$1
@@ -18,16 +19,25 @@ function do_start {
 	arg=$[$arg+1]
     done
    
-    if [ "$opt_file_max" ]; then
+    if [ -n "$opt_file_max" ]; then
 	echo $opt_file_max > /proc/sys/fs/file-max
     fi
    
-    if [ "$opt_hostname" ] ; then
+    if [ -n "$opt_hostname" ] ; then
 	echo "Setting hostname '$opt_hostname'"
 	echo ${opt_hostname%%.*} >/proc/sys/kernel/hostname
 	echo ${opt_hostname#*.} >/proc/sys/kernel/domainname
     fi
 
+    if [ "$opt_rtc" = "utc" ]; then
+	echo -n "Setting system time from hardware clock (UTC)... "
+	hwclock --hctosys --utc
+	echo "Done."
+    elif [ "$opt_rtc" = "local" ]; then
+	echo -n "Setting system time from hardware clock (Local time)... "
+	hwclock --hctosys --localtime
+	echo "Done."
+    fi
     for arg in ${opt_sysctl[*]}; do
 	local sysctl value
 	sysctl=${arg%%=*}
@@ -60,6 +70,16 @@ function do_stop {
 	arg=$[$arg-1]
 	rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
     done
+
+    if [ "$opt_rtc" = "utc" ]; then
+	echo -n "Saving system time to hardware clock (UTC)... "
+	hwclock --systohc --utc
+	echo "Done."
+    elif [ "$opt_rtc" = "local" ]; then
+	echo -n "Saving system time to hardware clock (Local time)... "
+	hwclock --systohc --localtime
+	echo "Done."
+    fi
 
     return 0
 }

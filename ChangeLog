@@ -1,3 +1,7 @@
+2003/07/22
+- hwclock implémenté dans script system et supprimé de NTP
+- correction de l'autonégociation dans network
+- update script firewall
 2003/06/24
 - nosuid,nodev sur /tmp dans rc.S
 - release 0.3.18

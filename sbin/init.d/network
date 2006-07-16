@@ -50,11 +50,11 @@ function set_media {
 	    ;;
 	full|fdx|100full|100fdx)
 	    /sbin/mii-diag -F 100baseTx-FD $1 >/dev/null 2>&1 || \
-		/sbin/ethtool -s $1 speed 100 duplex full autoneg off
+		/sbin/ethtool -s $1 autoneg off speed 100 duplex full
 	    ;;
 	half|hdx|100half|100hdx)
 	    /sbin/mii-diag -F 100baseTx-HD $1 >/dev/null 2>&1 || \
-		/sbin/ethtool -s $1 speed 100 duplex half autoneg off
+		/sbin/ethtool -s $1 autoneg off speed 100 duplex half
 	    ;;
 	*) /sbin/mii-diag -F $opt_media $1 >/dev/null ;;
     esac
@@ -78,8 +78,10 @@ function set_media2 {
 	miistr=${2:-100}baseTx-$miistr
     fi
 
+    # warning: with ethtool, it's important to set auto, then speed and duplex
+    # in this exact order.
     /sbin/mii-diag -F $miistr $1 >/dev/null 2>&1 || \
-	/sbin/ethtool -s $1 ${2:+speed $2} ${3:+duplex $3}
+	/sbin/ethtool -s $1 ${4:+autoneg $4} ${2:+speed $2} ${3:+duplex $3}
 }
 
 function fct_begin_section {

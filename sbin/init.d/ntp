@@ -5,7 +5,7 @@
 option	config		standard_option	/etc/ntp/ntp.conf
 option	keys		standard_option	/etc/ntp/ntp.keys
 option	pidfile		reserved_option	/var/run/ntp.pid
-option	hard_sync	boolean_option
+option	hard_sync	boolean_option	# not used anymore
 option	force_sync	boolean_option
 option	sync_servers	long_option
 
@@ -32,23 +32,12 @@ function fct_pre_start {
     if [ "$opt_force_sync" = "1" -a "$opt_sync_servers" ]; then
 	ntpdate -u -t 2 $opt_sync_servers
     fi
-    if [ "$opt_hardsync" = "1" ]; then
-	/sbin/hwclock -w --noadjfile --localtime
-    fi
-}
-
-# perform a forced synchronisation before stopping the daemon
-function fct_pre_stop {
-    if [ "$opt_hardsync" = "1" ]; then
-	/sbin/hwclock -w --noadjfile --localtime
-    fi
 }
 
 # execute a forced resynchronisation to sync servers
 function do_update {
     if [ "$opt_sync_servers" ]; then
 	ntpdate -t 2 -u $opt_sync_servers
-	/sbin/hwclock -w --noadjfile --localtime
     fi
 }
 

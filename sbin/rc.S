@@ -95,7 +95,7 @@ if [ ! -d /var/lib ] ; then mkdir /var/lib ; fi
 if [ ! -d /var/spool ] ; then mkdir /var/spool ; fi
 if [ ! -d /var/log ] ; then mkdir /var/log ; chown root:log /var/log; chmod 2750 /var/log; fi
 if [ ! -d /var/cache ] ; then mkdir /var/cache ; fi
-if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 500 /var/empty; fi
+if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 100 /var/empty; fi
 if [ ! -d /var/adm/. ] ; then ln -s log /var/adm ; fi
 
 sync
