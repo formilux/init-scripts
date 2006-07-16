@@ -1,3 +1,8 @@
+2003/10/26 : 0.3.25
+- network : now supports a "vrrp" option which is only used by external scripts.
+- squid   : fix squidguard handling
+- sysprofiles : close stdin during services startup to prevent them from reading
+  the services list as their input
 2003/10/02 : 0.3.24
 - functions : 'do_restart' now does its best to kill frozen processes and to
   bypass defuncts. Its goal is now clearly to get the service up at any cost.

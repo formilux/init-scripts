@@ -14,6 +14,7 @@
 #     [no] multicast
 #     shutdown
 #     ip route <ip/mask> <gw> [ip args...]
+#     vrrp ... (ignored by this script)
 
 # we want ALL instances to stop and restart at once
 if [ "$1" = "restart" ]; then
@@ -37,6 +38,7 @@ option	mtu		standard_option
 option	arp		boolean_option	1
 option	multicast	boolean_option	1
 option	shutdown	boolean_option
+option	vrrp	 	multiple_option
 
 SVC_VARS="addr_list route_list addr_idx route_idx"
 

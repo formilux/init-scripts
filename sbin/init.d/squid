@@ -13,7 +13,53 @@ option	waitrebuild	boolean_option 0
 option	reuseaddr	boolean_option 1
 option	doublecheck	boolean_option 0
 option	vhostaccel	boolean_option 0
+
 option	bin		reserved_option	/opt/sbin/squid
+option	gbin		reserved_option	/opt/bin/squidGuard
+option  pidfile         reserved_option /var/log/squid/squid.pid
+option  cmdline		reserved_option '$bin -D'
+
+function fct_pre_start {
+
+    valueof $opt_config cache_log >/dev/null 2>&1
+    [ -z "$REPLY" ] && REPLY=/var/log/squid/cache.log
+    [ ! -d ${REPLY%/*} ] && mkdir -p ${REPLY%/*} \
+        && chown -R squid:squid ${REPLY%/*}
+
+    valueof $opt_config cache_dir >/dev/null 2>&1
+    set -- $REPLY ; REPLY=$2
+    [ -z "$REPLY" ] && REPLY=/var/opt/squid/cache 
+    [ ! -d $REPLY ] && mkdir -p $REPLY \
+        && chown -R squid:squid $REPLY \
+        && $bin -z
+
+    valueof $opt_config redirect_program >/dev/null 2>&1
+    set -- $REPLY
+    if [ -n "$1" -a -z "${1//*squidGuard*/}" ] ; then 
+        echo -n "# Preparing squidGuard ... "
+        [ ! -e /var/log/squidGuard ] && ln -s squid /var/log/squidGuard
+        if [ ! -d /var/cache/squidGuard ] ; then
+            mkdir -p /var/cache/squidGuard
+            do_update_squidguard
+        fi
+        echo "done."
+    fi
+}
+
+function do_update_squidguard {
+    for file in $(find /opt/squidGuard/db/ \
+               -name "*.tgz" -o -name "*.tar.gz") ; do
+          tar zxf $file -C /var/cache/squidGuard
+    done
+    chown -R squid:squid /var/cache/squidGuard
+    sudo -u squid $gbin -C all </dev/null
+    find /var/cache/squidGuard/ -name "*.diff" | while read ; do
+              cat $REPLY >> ${REPLY%%[.0-9]*.diff}.diff
+    done
+    sudo -u squid $gbin -u </dev/null
+    find /var/cache/squidGuard/ -name "*.diff" | xargs rm -f
+    find /var/cache/squidGuard/ -name "*.db"|sed 's/\.db$//'|xargs rm -f
+}
 
 function fct_end_section {
     local chroot
