@@ -1,4 +1,5 @@
 2003/02/18
+- création de /var/state (utilisé par dhcp par exemple)
 - correction de mouse : utilise /usr/sbin/gpm
 - rectification de rc.S : bash ne teste pas l'état R/W des filesystems, donc on
   crée des fichiers temporaires. De plus, tentative coûte que coûte de créer /tmp.

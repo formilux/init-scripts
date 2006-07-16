@@ -90,6 +90,7 @@ fi
 # Create /var directories if they don't exist
 if [ ! -d /var/tmp ] ; then mkdir -m 1777 /var/tmp ; fi
 if [ ! -d /var/run ] ; then mkdir /var/run ; fi
+if [ ! -d /var/state ] ; then mkdir /var/state ; fi
 if [ ! -d /var/lib ] ; then mkdir /var/lib ; fi
 if [ ! -d /var/spool ] ; then mkdir /var/spool ; fi
 if [ ! -d /var/log ] ; then mkdir /var/log ; fi
