@@ -2,6 +2,8 @@
 - hwclock implémenté dans script system et supprimé de NTP
 - correction de l'autonégociation dans network
 - update script firewall
+- system utilise rtc=local par defaut
+- release 0.3.20
 2003/06/24
 - nosuid,nodev sur /tmp dans rc.S
 - release 0.3.18

@@ -6,7 +6,7 @@ option	hostname	standard_option
 option	modprobe 	multiple_option
 option	sysctl		multiple_option
 option	file_max	standard_option
-option	rtc		standard_option	"utc"
+option	rtc		standard_option	"local"
 
 function do_start {
     local svcname=$1
