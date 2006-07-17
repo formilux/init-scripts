@@ -1,3 +1,28 @@
+2008/10/07 : 0.3.39
+        * functions: several improvements in section edition
+        * functions: implement the "autostart" action to manipulate the autostart status
+        * functions: several fixes and cleanups for the two latest patches
+        * functions: rewrite --list_sections
+        * functions: the "no service" statement was not properly handled
+        * functions: move main to the top of the script
+        * functions: clean up trailing spaces
+2008/09/29 : 0.3.38
+        * functions: small performance improvements (~5-10%)
+        * functions: update to aloha-2.5 (getconf, ...)
+        * functions: add support for default service values (from aloha-trunk)
+        * functions: set default reload to restart (from utm-gw)
+        * functions: change autostart to type reserved_bool_option
+        * functions: limit config.rc parsing to the requested section(s)
+        * functions: use direct access to service options.
+        * functions: make parse_cfg aware of declared options
+        * functions: make parse_cfg more generic and create run_stdin
+        * functions: parse default configs using the parse_cfg function
+        * functions: do not report unknown parameters when listing sections
+        * functions: get rid of build_default_funcs
+        * functions: remove calls to basename/dirname
+        * functions: turn a few "function xxx" into "xxx()"
+        * functions: make "no xxx" check that "xxx" exists
+        * functions: do not purge variables, just functions upon end of section
 2007/10/01 : 0.3.37
 - added bootmodules, autoraid, listpart, service
 2007/09/25 :
