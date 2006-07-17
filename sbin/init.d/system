@@ -93,13 +93,13 @@ function do_start {
 
     do_date_from_hw
 
-    for arg in ${opt_sysctl[*]}; do
+    for arg in "${opt_sysctl[@]}"; do
 	local sysctl value
-	sysctl=${arg%%=*}
-	sysctl=${sysctl//.//}
-	value=${arg##*=}
+	sysctl="${arg%%=*}"
+	sysctl="${sysctl//.//}"
+	value="${arg##*=}"
 	if [ -e "/proc/sys/$sysctl" ]; then
-	    echo $value > /proc/sys/$sysctl
+	    echo "$value" > "/proc/sys/$sysctl"
 	else
 	    echo "Non-existent sysctl entry : $arg"
 	fi
