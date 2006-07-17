@@ -124,6 +124,7 @@ function childrenpid {
 # (ie: no pidfile used). Only processes which have ppid of 1 (or parent_pid)
 # are returned. A list of pids to omit can be specified with "-o".
 # If no process name is specified, all the parent's children are returned.
+# if "parent_pid" is empty, then the parent's pid is not checked.
 # svc_pidof [ -o "omit_pids*" ]* [ -p parent_pid ] [ PNAME ... ]
 function svc_pidof {
     local omit=x
@@ -141,7 +142,7 @@ function svc_pidof {
     #set -- "$( exec ps ahxo pid,ppid,comm )" ; set -- $( echo "$1" | awk '{ print $1,$2,$3}' )
     set -- $( ps ahxo pid,ppid,comm | awk '{ print $1,$2,$3}' )
     while [ $# -gt 0 ] ; do 
-	[ -z "${comm/* $3 */}" -a -n "${omit/* $1 */}" -a "$2" = "$ppid" ] && found="$found $1" 
+	[ -z "${comm/* $3 */}" -a -n "${omit/* $1 */}" ] && [ -z "$ppid" -o "$2" = "$ppid" ] && found="$found $1" 
 	shift ; shift ; shift
     done
     REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
@@ -720,6 +721,7 @@ function default_service {
 		else
 		    echo "Error: Unknown action : $ACTION"
 		fi
+		((0))  # report an error
 	    fi
 	fi
 	ret=$?
