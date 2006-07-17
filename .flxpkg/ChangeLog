@@ -1,3 +1,22 @@
+2008/09/29 06:49  willy@wtap
+	* functions: small performance improvements (~5-10%)
+	* functions: update to aloha-2.5 (getconf, ...)
+	* functions: add support for default service values (from aloha-trunk)
+	* functions: set default reload to restart (from utm-gw)
+	* functions: change autostart to type reserved_bool_option
+	* functions: limit config.rc parsing to the requested section(s)
+	* functions: use direct access to service options.
+	* functions: make parse_cfg aware of declared options
+	* functions: make parse_cfg more generic and create run_stdin
+	* functions: parse default configs using the parse_cfg function
+	* functions: do not report unknown parameters when listing sections
+	* functions: get rid of build_default_funcs
+	* functions: remove calls to basename/dirname
+	* functions: turn a few "function xxx" into "xxx()"
+	* functions: make "no xxx" check that "xxx" exists
+	* functions: do not purge variables, just functions upon end of section
+	* released init-scripts-0.3.38-flx0.1
+
 2007/10/01 11:51  willy@wtap
 
 	* released init-scripts-0.3.37-flx0.1
