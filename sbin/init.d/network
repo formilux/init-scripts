@@ -27,6 +27,9 @@ elif [ "$1" = "reload" ]; then
   $0 flush "$@"
   $0 start "$@"
   exit $?
+elif [ "$1" = "complete" ]; then
+  compgen -W "help status start stop flush reload restart check list_options" "$2"
+  exit 0
 fi
 
 . `dirname $0`/functions
@@ -38,7 +41,8 @@ option	media		standard_option
 option	duplex		standard_option
 option	speed		standard_option
 option	auto		standard_option
-option  slave           multiple_option
+option	slave		multiple_option
+option	sysctl		multiple_option
 option	modprobe 	multiple_option
 option	lladdr		standard_option
 option	mtu		standard_option
@@ -62,6 +66,7 @@ function do_help {
     echo "   - speed  {10|100|1000}"
     echo "   - auto   {on|off}"
     echo "   - slave  <interface*>"
+    echo "   - sysctl <var>=<val>"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
     echo "   - lladdr <mac_addr>"
@@ -92,27 +97,31 @@ function set_media {
 }
 
 # changes the negociation parameters for interface $1
-# $2=speed(10|100|1000) or "" if unchanged
-# $3=duplex(half|full) or "" if unchanged
-# $4=auto(on|off) or "" if unchanged
+# $2=speed(10|100|1000) or "-" if unchanged
+# $3=duplex(half|full) or "-" if unchanged
+# $4=auto(on|off) or "-" if unchanged
 function set_media2 {
-    local miistr
-    if [ "$4" = "on" ]; then
+    local miistr speed duplex
+
+    speed="$2"; [ "$speed" = "-" ] && speed=""
+    duplex="$3"; [ "$duplex" = "-" ] && duplex=""
+    if [ "$4" = "on" ] || [ -z "$speed" -a -z "$duplex" ]; then
 	/sbin/mii-diag -r $1 >/dev/null 2>&1 || \
 	    /sbin/ethtool -s $1 autoneg on
+        [ -n "$speed" -o -n "$duplex" ] || return 0
     fi
 
-    [ "$3" = "half" ] && miistr="HD" || miistr="FD"
-    if [ "$2" = "10" ]; then
+    [ "$duplex" = "half" ] && miistr="HD" || miistr="FD"
+    if [ "$speed" = "10" ]; then
 	miistr=10baseT-$miistr
     else
-	miistr=${2:-100}baseTx-$miistr
+	miistr=${speed:-100}baseTx-$miistr
     fi
 
     # warning: with ethtool, it's important to set auto, then speed and duplex
     # in this exact order.
     /sbin/mii-diag -F $miistr $1 >/dev/null 2>&1 || \
-	/sbin/ethtool -s $1 ${4:+autoneg $4} ${2:+speed $2} ${3:+duplex $3}
+	/sbin/ethtool -s $1 ${4:+autoneg $4} ${speed:+speed $speed} ${duplex:+duplex $duplex}
 }
 
 function fct_begin_section {
@@ -170,6 +179,20 @@ function do_start {
 	    fi
 	    arg=$[$arg+1]
 	done
+
+        # The sysctl refers to /proc/sys/net.
+        for arg in "${opt_sysctl[@]}"; do
+            local sysctl value
+            sysctl="${arg%%=*}"
+            sysctl="${sysctl//.//}"
+            value="${arg##*=}"
+            if [ -e "/proc/sys/net/$sysctl" ]; then
+                echo "$value" > "/proc/sys/net/$sysctl"
+            else
+                echo "Non-existent network sysctl entry : $arg"
+            fi
+        done
+
 	arg=0
 	while [ $arg -lt ${#opt_load[*]} ]; do
 	    if [ "${opt_load[$arg]}" != "#" ]; then
@@ -227,6 +250,7 @@ function do_start {
 	fi
 	arg=$[$arg+1]
     done
+
     arg=0
     while [ $arg -lt ${#opt_load[*]} ]; do
         if [ "${opt_load[$arg]}" != "#" ]; then
@@ -254,6 +278,25 @@ function do_start {
 
     ip link set $instname down >/dev/null 2>&1
     ip addr flush dev $instname >/dev/null 2>&1
+
+    # We do this to bind IPv4 immediately to this interface.
+    # It's problematic with the 'lo' device because bringing it up with IPv4
+    # bound automatically adds the address 127.0.0.1/8.
+    if [ ${#opt_sysctl[@]} -gt 0 ]; then
+        ip addr add 0.0.0.0 dev $instname >/dev/null 2>&1
+    fi
+
+    for arg in "${opt_sysctl[@]}"; do
+        local sysctl value
+        sysctl="${arg%%=*}"
+        sysctl="${sysctl//.//}"
+        value="${arg##*=}"
+        if [ -e "/proc/sys/net/ipv4/conf/$instname/$sysctl" ]; then
+            echo "$value" > "/proc/sys/net/ipv4/conf/$instname/$sysctl"
+        else
+            echo "Non-existent network sysctl entry for $instname : $arg"
+        fi
+    done
 
     if [ "$opt_lladdr" ]; then
 	ip link set $instname address $opt_lladdr
