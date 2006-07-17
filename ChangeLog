@@ -1,3 +1,5 @@
+2006/07/17 : 0.3.36
+- added the 'new', 'gen', 'try' options to init.d/firewall
 2006/02/02 : 0.3.35
 - the network script can now set the hostname via DHCP and waits 1 second for
   the link to set up when needed before the DHCP request.

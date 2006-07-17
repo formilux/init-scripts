@@ -21,6 +21,7 @@ conntrack_args=( )
 
 function do_help {
     echo "Usage: ${0##*/} <status|start|revert|maint|stop|route|block|help>"
+    echo "                <new|gen|try>"
     echo "List of config.rc options (name, type, default value, current value) :"
     echo
     echo "   - confdir  : dir     ; def='/etc/firewall' ; cur=$opt_confdir"
@@ -476,6 +477,109 @@ function do_route {
     echo -n "Firewall: enabling IP forwarding..."
     enable_forwarding
     echo "OK."
+    return 0
+}
+
+# create new test directory
+function do_new {
+    if [ -e $opt_confdir/new ] ; then
+      echo -n "A pending firewall config already exists, remove [y/N] ? "
+      read
+      if [ "$REPLY" != y -a "$REPLY" != Y ] ; then
+        echo "Operation cancelled." >&2
+        return 1
+      fi
+      rm -f $opt_confdir/new
+    fi 
+
+    local NEWDATE=$(date +%Y%m%d-%H%M)
+
+    if ! mkdir $opt_confdir/$NEWDATE 2>/dev/null ; then
+      echo "A pending directory already exist for this time, " >&2
+      echo "Try in 1 minute or edit $opt_confdir/new" >&2
+      return 1   
+    fi
+
+    ln -s $NEWDATE $opt_confdir/new
+
+    if [ -d $opt_confdir/current/. ] ; then
+      cp -a $opt_confdir/current/. $opt_confdir/new/.
+    elif [ -d $opt_confdir/backup/. ] ; then
+      cp -a $opt_confdir/backup/. $opt_confdir/new/.
+    elif [ -d $opt_confdir/maint/. ] ; then
+      cp -a $opt_confdir/maint/. $opt_confdir/new/.
+    fi
+
+    echo "Pending config ($NEWDATE) create in $opt_confdir/new" >&2
+
+    return 0  
+}
+
+# generate ipt config file for host with genrules with pending config
+function do_gen {
+    _GENRULES=$(type -p genrules 2>/dev/null)
+    if [ $? != 0 ] ; then
+      echo "Can not find binary 'genrules' in PATH" >&2
+      return 1
+    fi
+
+    if [ ! -e $opt_confdir/new ] ; then
+      echo "The pending directory doesn't exists, run 'new' before 'gen'" >&2
+      return 1
+    fi
+
+    $_GENRULES $opt_confdir/new $(uname -n)
+ 
+    return $?
+}
+
+# apply new config but do not save it
+function do_try {
+    if [ ! -e $opt_confdir/new/conf-$(uname -n).ipt ] ; then
+      echo "No config in the pending directory, run 'gen' before 'try'" >&2
+      return 1
+    fi
+
+    local TEMP=/tmp/fw.try.$RANDOM.$RANDOM
+
+    /sbin/iptables-save > $TEMP
+
+    if ! /sbin/iptables-restore < $opt_confdir/new/conf-$(uname -n).ipt ; then
+      /sbin/iptables-restore < $TEMP
+      rm -f $TEMP
+      echo "Error loading pending config" >&2
+      return 1
+    fi
+
+    echo "Try succedded, run 'save' to save it as current config" >&2
+
+    rm -f $TEMP
+
+    return 0
+}
+
+# save the new config in current profile
+function do_save {
+    if [ ! -e $opt_confdir/new ] ; then
+      echo "No pending config to save" >&2
+      return 1
+    fi
+
+    if [ ! -e $opt_confdir/backup -o -L $opt_confdir/backup ] ; then
+      [ -e $opt_confdir/backup ] \
+        && rm -f $opt_confdir/backup
+    else
+      echo "$opt_confdir/backup isn't a symbolic link, can't save" >&2
+      return 1
+    fi
+    if [ ! -e $opt_confdir/current -o -L $opt_confdir/current ] ; then
+      [ -e $opt_confdir/current ] \
+        && mv $opt_confdir/current $opt_confdir/backup
+    else
+      echo "$opt_confdir/current isn't a symbolic link, can't save" >&2
+      return 1
+    fi
+    mv $opt_confdir/new $opt_confdir/current
     return 0
 }
 

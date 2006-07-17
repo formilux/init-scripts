@@ -1,3 +1,8 @@
+2006/07/17 14:00  root@wtap
+
+	* released init-scripts-0.3.36-flx0.1
+	* added the 'new', 'gen', 'try' options to init.d/firewall
+
 2006/02/02 11:00  willy@wtap
 
 	* released init-scripts-0.3.35-flx0.1
