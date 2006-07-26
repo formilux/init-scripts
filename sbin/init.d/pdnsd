@@ -1,0 +1,16 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config		standard_option	/etc/pdnsd.conf
+option	pidfile		reserved_option	/var/run/syslog-ng.pid
+
+option	bin		reserved_option	/usr/sbin/pdnsd
+option	cmdline		reserved_option	'$bin -c $opt_config -d -p $pidfile'
+
+# perform a forced synchronisation before starting the daemon
+function fct_pre_start {
+    if [ ! -d /var/cache/pdnsd ] ; then mkdir -p /var/cache/pdnsd ; fi
+}
+
+load_config

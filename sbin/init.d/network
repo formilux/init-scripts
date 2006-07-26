@@ -1,0 +1,407 @@
+#!/bin/bash
+
+# service network [<ifname>]       # interface name -> int_<ifname>=enable
+#     ip address <ip/mask> [secondary]  # address for this interface 
+#     media {auto|full|fdx|100full|100fdx|half|hdx|100half|100hdx>
+#     slave <if> ...
+#     modprobe [module [module_options]]
+#     lladdr <mac_addr>
+#     mtu <mtu>
+#     [no] arp
+#     [no] multicast
+#     shutdown
+#     ip route <ip/mask> <gw>
+
+. `dirname $0`/functions
+
+option	ip		option_ip
+option	media		standard_option
+option	slave		multiple_option
+option	modprobe 	multiple_option
+option	lladdr		standard_option
+option	mtu		standard_option
+option	arp		boolean_option	1
+option	multicast	boolean_option	1
+option	shutdown	boolean_option
+
+SVC_VARS="addr_list route_list addr_idx route_idx"
+
+function fct_begin_section {
+    addr_list=( )
+    route_list=( )
+    addr_idx=0
+    route_idx=0
+}
+
+# usage: ip <ip> {addr|route} ...
+function option_ip {
+    shift
+    local cmd=$1
+    shift
+    case "$cmd" in
+	addr|address)
+	    addr_list[$addr_idx]="$*"
+	    addr_idx=$[$addr_idx+1]
+	    ;;
+	route)
+	    route_list[$route_idx]="$*"
+	    route_idx=$[$route_idx+1]
+	    ;;
+	dhcp)
+	    addr_list[$addr_idx]="dhcp"
+	    addr_idx=$[$addr_idx+1]
+	    ;;
+	--disable)
+	    ;;
+	*)
+	    echo "Unknown ip command : $cmd $*"
+	    return 1
+    esac
+}
+
+function do_start {
+    local svcname=$1
+    local instname=$2
+    local arg
+
+    if [ -z "$instname" ]; then
+	echo "# Starting $svcname ..."
+	#if [ "$opt_modprobe" != "#" ]; then
+	#    modprobe $opt_modprobe || return 1
+	#fi
+	arg=0
+	while [ $arg -lt ${#opt_modprobe[*]} ]; do
+	    if [ "${opt_modprobe[$arg]}" != "#" ]; then
+		modprobe ${opt_modprobe[$arg]} || return 1
+	    fi
+	    arg=$[$arg+1]
+	done
+	arg=0
+	while [ $arg -lt $route_idx ]; do
+	    local dest gw
+	    dest=${route_list[$arg]%%[ 	]*}
+	    gw=${route_list[$arg]##*[ 	]}
+	    ip route add $dest via $gw
+	    arg=$[$arg+1]
+	done
+	echo "  ==> start $svcname : Done."
+	return $?
+    fi
+
+    if [ "$opt_shutdown" = 1 ]; then
+	return 0
+    fi
+
+    echo "# Starting $svcname${instname:+[$instname]} ..."
+    # we only check running instances when an interface is defined
+    do_status $svcname $instname > /dev/null 2>&1
+    if [ $? = 0  -a $FORCE_START_STOP -eq 0 ] ; then
+	echo "  ==> Service $svcname${instname:+[$instname]} already running.";
+	[ $SVC_AUTO_START -eq 0 ] && echo "  ==> please use '--force' or 'restart' instead or check with 'status'."
+	return 0
+    fi
+
+    arg=0
+    while [ $arg -lt ${#opt_modprobe[*]} ]; do
+	if [ "${opt_modprobe[$arg]}" != "#" ]; then
+	    if ! modprobe ${opt_modprobe[$arg]}; then
+		echo "  ==> start $svcname${instname:+[$instname]} : modprobe ${opt_modprobe[$arg]} Failed."
+		return 1
+	    fi
+	else
+	    local err	# do not merge the assignment here, local sets $? to 0 !
+	    err=`modprobe $instname 2>&1`
+	    if [ $? -gt 0 ]; then
+		if ! grep -q "^[ 	]*$instname:" /proc/net/dev >/dev/null 2>&1; then
+		    echo "  ==> modprobe $instname failed : $err"
+		    return 1
+		fi
+	    fi
+	fi
+	arg=$[$arg+1]
+    done
+
+    ip addr flush dev $instname >/dev/null 2>&1
+    ip link set $instname down >/dev/null 2>&1
+
+    if [ "$opt_media" ]; then
+	case "$opt_media" in
+	    auto) /sbin/mii-diag -r $instname >/dev/null ;;
+	    full|fdx|100full|100fdx) /sbin/mii-diag -F 100baseTx-FD $instname >/dev/null ;;
+	    half|hdx|100half|100hdx) /sbin/mii-diag -F 100baseTx-HD $instname >/dev/null ;;
+	    *) /sbin/mii-diag -F $opt_media $instname >/dev/null ;;
+	esac
+	echo "  ==> Link set to $opt_media for interface $instname"
+    fi
+
+    if [ "$opt_lladdr" ]; then
+	ip link set $instname address $opt_lladdr
+    fi
+
+    if [ "$opt_mtu" ]; then
+	ip link set $instname mtu $opt_mtu
+    fi
+
+    if [ "$opt_multicast" != 1 ]; then
+	ip link set $instname multicast off
+    #else
+	#ip link set $instname multicast on
+    fi
+
+    if [ "$opt_arp" != 1 ]; then
+	ip link set $instname arp off
+    fi
+
+    if ! ip link set $instname up; then
+	echo "  ==> start $svcname${instname:+[$instname]} : Failed."
+	return 1
+    fi
+    if [ ${#opt_slave[*]} -gt 0 ]; then
+	for arg in ${opt_slave[*]}; do
+	    if ! $PFULLNAME status $arg >/dev/null 2>&1; then
+		echo "  ==> need to start slave $arg first"
+	    else
+		ifenslave $instname $arg
+	    fi
+	done
+    fi
+
+    arg=0
+    while [ $arg -lt $addr_idx ]; do
+	if [ "${addr_list[$arg]}" = "dhcp" ]; then
+	    echo "  ==> Waiting for ip address with DHCP request ... "
+	    dhcpcd -t 10 $instname
+	else
+	    ip addr add ${addr_list[$arg]} dev $instname
+	fi
+	arg=$[$arg+1]
+    done
+
+    arg=0
+    while [ $arg -lt $route_idx ]; do
+	local dest gw
+	dest=${route_list[$arg]%%[ 	]*}
+	gw=${route_list[$arg]##*[ 	]}
+	ip route add $dest via $gw dev $instname
+	arg=$[$arg+1]
+    done
+    echo "  ==> start $svcname${instname:+[$instname]} : Done."
+}
+
+function do_status {
+    local instname=$2
+    if [ "$instname" ]; then
+	if ip link show $instname | grep -q UP; then
+	    echo "Interface $instname is up."
+	    return 0
+	else
+	    echo "Interface $instname is down."
+	    return 1
+	fi
+    #else
+    #	 if ip route list | grep -q dev; then
+    #	     echo "Network is up."
+    #	     return 0
+    #	 else
+    #	     echo "Network is down."
+    #	     return 1
+    #	 fi
+    fi
+    REPLY=
+    return 0
+}
+
+
+function do_stop {
+    local svcname=$1
+    local instname=$2
+    local arg
+
+    if [ -z "$instname" ]; then
+	echo "# Stopping $svcname ..."
+	arg=${#opt_modprobe[*]}
+	while [ $arg -gt 0 ]; do
+	    arg=$[$arg-1]
+	    if [ "${opt_modprobe[$arg]}" != "#" ]; then
+		rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
+	    fi
+	done
+
+	arg=0
+	while [ $arg -lt $route_idx ]; do
+	    ip route del ${route_list[$arg]} >/dev/null 2>&1
+	    arg=$[$arg+1]
+	done
+	return $?
+    fi
+
+    echo "# Stopping $svcname${instname:+[$instname]} ..."
+
+    if ! do_status $svcname $instname > /dev/null 2>&1; then
+	echo "  ==> stop $svcname${instname:+[$instname]} : already stopped."
+	return 0
+    fi
+
+    # we may have to kill dhcpcd
+    arg=0
+    while [ $arg -lt $addr_idx ]; do
+	if [ "${addr_list[$arg]}" = "dhcp" ]; then
+	    local proc
+	    for proc in $(svc_pidof dhcpcd) ; do 
+		if grep -qs $instname /proc/$proc/cmdline ; then kill $proc ; fi
+	    done   
+	fi
+	arg=$[$arg+1]
+    done
+
+    ip addr flush dev $instname >/dev/null 2>&1
+    ip link set $instname down >/dev/null 2>&1
+
+    arg=${#opt_modprobe[*]}
+    while [ $arg -gt 0 ]; do
+	arg=$[$arg-1]
+	if [ "${opt_modprobe[$arg]}" != "#" ]; then
+	    rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
+	else
+	    rmmod -r $instname >/dev/null 2>&1
+	fi
+    done
+    echo "  ==> stop $svcname${instname:+[$instname]} : Done."
+}
+
+#### these are the old versions. The slave mechanism should be checked.
+
+_start_if() {
+  local eth=$1
+  local temp=`eval echo \\$int_${eth}_modprobe`
+  ip link show $eth >/dev/null 2>&1
+  if [ "$temp" -a $? -ne 0 ] ; then
+    if [ "$temp" = modprobe ] ; then
+      modprobe $eth
+    else
+      modprobe $temp
+    fi
+  fi
+
+  ip link show $eth | grep -q UP 
+  if [ $? = 0 ] ; then 
+    echo "Interface $eth already configured"
+    continue
+  fi
+
+  if [ "`eval echo \\$int_${eth}_slave`" ]; then
+    # the slaves should be up before continuing
+    for int in `eval echo \\$int_${eth}_slave`; do
+      start_if $int
+    done
+  fi
+
+  if [ "`eval echo \\$int_${eth}_media`" ]; then
+    media=`eval echo \\$int_${eth}_media`
+    case "$media" in
+      auto) /sbin/mii-diag -r $eth >/dev/null ;;
+      full|fdx|100full|100fdx) /sbin/mii-diag -F 100baseTx-FD $eth >/dev/null ;;
+      half|hdx|100half|100hdx) /sbin/mii-diag -F 100baseTx-HD $eth >/dev/null ;;
+      *) /sbin/mii-diag -F $media $eth >/dev/null ;;
+    esac
+    echo "Link set to $media for interface $eth"
+  fi
+
+  ip link set $eth up
+  ip addr flush dev $eth >/dev/null 2>&1
+  if [ "`eval echo \\$ip_dhcp_$eth`" = enable ] ; then
+    echo "Waiting for ip address with DHCP request ... "
+    dhcpcd -t 10 $eth
+  elif [ "`eval echo \\$ip_address_$eth`" ]; then
+    ip_address=`eval echo \\$ip_address_$eth`
+    ip_address_sec=`eval echo \\$ip_address_sec_$eth`
+    echo "Setting ip address $ip_address to interface $eth"
+    ip addr add $ip_address dev $eth
+    for addr in $ip_address_sec ; do
+      echo "Setting secondary ip address $addr to interface $eth"
+      ip addr add $addr dev $eth
+    done
+  fi
+
+  if [ "`eval echo \\$int_${eth}_slave`" ]; then
+    ifenslave $eth `eval echo \\$int_${eth}_slave`
+    # we prefer no ip address on the slaves
+    for int in `eval echo \\$int_${eth}_slave`; do
+      ip addr flush dev $int
+    done
+  fi
+
+  addr=`ip addr show $eth  | grep "inet " | sed 's/^.*inet \([^ ]\+\) .*$/\1/'`
+  if [ ! -z "$addr" ]; then
+     if [ ! -z "$display_addr_in_issue" ]; then
+        echo "  -> $eth has address $addr"
+        echo "$eth has address $addr" >> /etc/issue
+     fi
+  else
+     if [ ! -z "$display_addr_in_issue" ]; then
+        echo "  -> $eth has no address"
+        echo "$eth has no address" >> /etc/issue
+     fi
+  fi
+}
+
+_do_start()
+{
+ # set hostname
+ if [ "$hostname" ] ; then
+  echo "Setting hostname '$hostname'"
+  hostname $hostname
+  domainname `echo $hostname | cut -f2- -d.`
+ fi 
+
+ # set ip address for each interface
+ for eth in `set|grep -a '^int_[a-zA-Z0-9:-_]*=enable$'|\
+            sed -e 's/.*_\(.*\)=.*/\1/'` ; do
+ 	start_if $eth
+ done
+
+ # set ip route
+ for route in `echo $ip_route` ; do
+  way=`echo $route | cut -f1 -d:`
+  if [ -z "$way" ] ; then way=default ; fi
+  gateway=`echo $route | cut -f2 -d":"`
+  echo "Setting route $way via $gateway"
+  /sbin/ip route add $way via $gateway
+ done
+}
+
+_do_stop()
+{
+ for eth in `set|grep -a '^int_[a-zA-Z0-9:-_]*=enable$'|\
+            sed -e 's/.*_\(.*\)=.*/\1/'` ; do
+  echo "Shutting down $eth"
+  if [ "`eval echo \\$ip_dhcp_$eth`" = enable ] ; then
+    for proc in `pidof dhcpcd` ; do 
+      if grep -qs $eth /proc/$proc/cmdline ; then kill $proc ; fi
+    done   
+  fi
+  ip addr flush dev $eth >/dev/null 2>&1
+  ip link set $eth down
+  if [ ! -z `eval echo \\$int_"$eth"_slave` ]; then
+    for slave in `eval echo \\$int_"$eth"_slave`; do
+	ip link set $slave down arp on
+	ip addr flush dev $slave >/dev/null 2>&1
+    done
+  fi
+  if [ ! -z "$display_addr_in_issue" ]; then
+     grep -v "$eth " /etc/issue > /etc/issue- && mv /etc/issue- /etc/issue
+  fi
+ done
+}
+
+_do_status() 
+{
+    echo "'ip addr show' give:"
+    ip addr show
+    echo "'ip route show' give:"
+    ip route show
+} 
+
+load_config
+
+

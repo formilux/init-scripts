@@ -1,0 +1,100 @@
+#!/bin/bash 
+
+. `dirname $0`/functions
+
+option	output		standard_option
+option	runas		standard_option stat
+option	opt		long_option
+option	freq		standard_option
+option	method		standard_option
+option	statusfile	standard_option
+option	check_interval	reserved_option 60
+option	bin		reserved_option /opt/exosec/bin/statistics
+
+function fct_begin_section {
+    # assign the default instance name from the config file argument
+    pidfile=/var/run/stat/$2.pid
+    procname=statistics
+    opt_statusfile=/var/run/stat/$2.nfo
+    opt_output=/var/run/stat/$2.log
+}
+
+function do_start {
+    local p=$1 ; shift
+    local testname=$1
+    local message
+
+    opt_method=${opt_method:-$testname}
+    if [ "$FORCE_START_STOP" -eq 0 ] && do_status $p $testname > /dev/null ; then
+	echo "Already started, stop it before restarting"
+	return 1
+    fi
+ 
+    message="# Starting Monitoring on $testname for $testname statistics ..."
+    echo "$message"
+
+    { local path
+	for path in `dirname $pidfile` `dirname $opt_statusfile` `dirname $opt_output`; do
+	    mkdir -p $path 2> /dev/null && \
+	    { [ -z "$opt_runas" ] || chown $opt_runas $path && chmod 700 $path ; } \
+	       || { echo "Bad owner or rights on directory $path ($opt_runas:700), fix it." 
+		    return 1 ; }
+	done ;
+    }
+
+    # note: here, cmdline doesn't include $bin.
+    cmdline="-t $opt_method -o $opt_output -s $opt_statusfile -p $pidfile
+	    -w $opt_freq -n $testname $opt_opt"
+
+    if [ -z "$opt_runas" ] ; then
+	( $bin $cmdline )
+    else
+	( su - $opt_runas $cmdline )
+    fi
+
+    if [ "$?" = 0 ] ; then 
+	echo "$message done."
+    else
+	echo "$message error."
+    fi
+}
+
+function do_check { 
+  local run_stat date status service result next_stat
+  local service=$1 instance=$2
+
+  if do_status $service $instance > /dev/null ; then
+    run_stat=RUNNING
+    uptime=$[ $( date +%s ) - $( date -d "$( ps ho lstart $REPLY)" +%s ) ] 
+  else
+    run_stat=STOPPED
+    uptime=0
+  fi
+  read idsvc date status result < $opt_statusfile > /dev/null 2>&1 
+  if [ $? != 0 ] ; then 
+    echo "$HOSTNAME $2 $(date +%s) FATAL" ; return 1
+  fi
+
+  diff=$[ $(date +%s) - $date ]
+  [ $[ $diff > 2 * $opt_freq ] = 1 -a $status = OK ] && 
+     status="ALERT"
+  [ $[ $diff > $opt_freq ] = 1 -a $status = OK ] && 
+     status="WARNING"
+ 
+  if [ $run_stat = RUNNING ] ; then
+    read pid < $pidfile
+    set -- $( ps ahxo ppid,pid,comm,lstart | \
+                  awk '{if ($1 == '$pid' && $3 == "sleep") print $0 } ') 
+    if [ $# == 0 ] ; then
+      status=$status,$opt_freq
+    else
+      pid=$2 ; shift 3 ; start=$( date -d "$*" +%s)
+      next_stat=$[ $opt_freq - $(date +%s) + $start ]
+      status=$status,$next_stat
+    fi
+  fi
+  
+  echo "$HOSTNAME $service.$instance $date $run_stat $uptime $status $result"
+}
+
+load_config

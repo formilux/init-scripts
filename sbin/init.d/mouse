@@ -1,0 +1,16 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	type		standard_option	ps2
+option	device		standard_option	/dev/mouse
+option	bin		reserved_option	/sbin/gpm
+option	procname	reserved_option	gpm
+option	cmdline		reserved_option	'$bin -t $opt_type -m $opt_device'
+option	pidfile		reserved_option	/var/run/gpm.pid
+
+function fct_pre_stop {
+   $cmdline -k >/dev/null 2>&1
+}
+
+load_config

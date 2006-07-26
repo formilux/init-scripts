@@ -1,0 +1,9 @@
+2003/01/26: echelog
+- lecture du fichier de configuration de echelog, déduction des sous fichiers
+  de configuration et des répertoires de spool
+- do_stop spécifique
+20030115-b :
+- ntp: option keys à utiliser sous la forme opt_keys dans cmdline
+- ntp: positonnel procname à ntpd 
+* echelogd: traiter l'impossibilité d'ouverture pour cause de mauvais
+  positionnement dans le cache du Sender/Receiver

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config		standard_option	/etc/syslog-ng/syslog-ng.conf
+option	pidfile		reserved_option	/var/run/syslog-ng.pid
+
+option	bin		reserved_option	/sbin/syslog-ng
+option	cmdline		reserved_option	'$bin -f $opt_config -p $pidfile'
+
+# perform a forced synchronisation before starting the daemon
+function fct_post_start {
+    /sbin/init.d/klogd start >/dev/null 2>&1 || echo "Error starting klogd."
+}
+
+# perform a forced synchronisation before stopping the daemon
+function fct_pre_stop {
+    /sbin/init.d/klogd stop >/dev/null 2>&1 || echo "Error stopping klogd."
+}
+
+function do_update {
+    if [ -e $pidfile ] ; then 
+        read < $pidfile 
+        [ "$pidfile" ] && kill -HUP $REPLY > /dev/null 2>&1
+    fi
+}
+
+load_config

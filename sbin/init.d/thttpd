@@ -1,0 +1,27 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	config	standard_option
+option	port	standard_option 80
+option	docroot	standard_option /var/www
+option	chroot	boolean_option	1
+option	symlink	boolean_option	1
+option	user	standard_option
+option	address	standard_option
+option	logfile	standard_option
+option	charset	standard_option iso-8859-1
+option	bin	reserved_option	/usr/sbin/thttpd
+
+# assign default values to options and variables before parsing the cfg file
+function fct_begin_section {
+    pidfile="/var/run/thttpd-$2.pid"
+    cmdline='$bin ${opt_config:+-C $opt_config} ${opt_port:+-p $opt_port}
+	     ${opt_docroot:+-d $opt_docroot} ${opt_chroot:+-r} ${opt_symlink:+-s}
+	     ${opt_user:+-u $opt_user} ${opt_address:+-h $opt_address}
+	     ${opt_logfile:+-l $opt_logfile} ${opt_charset:+-T $opt_charset}
+	     ${pidfile:+-i $pidfile}'
+}
+
+load_config
+

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+option	pidfile		reserved_option	/var/run/klogd.pid
+option	bin		reserved_option	/usr/sbin/klogd
+option	console_level	standard_option	4
+option	kernel_symbols	standard_option	/boot/`uname -r`/System.map
+option	cmdline		reserved_option	'$bin ${opt_console_level:+-c $opt_console_level} ${opt_kernel_symbols:+-k $opt_kernel_symbols}'
+
+load_config
