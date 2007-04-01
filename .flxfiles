@@ -2,6 +2,7 @@ sbin/init.d
 sbin/init.d/echelogd
 sbin/init.d/firewall
 sbin/init.d/functions
+sbin/init.d/ipforward
 sbin/init.d/keyboard
 sbin/init.d/klogd
 sbin/init.d/monitor

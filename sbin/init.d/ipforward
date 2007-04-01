@@ -1,0 +1,70 @@
+#!/bin/bash
+
+. `dirname $0`/functions
+
+function do_help {
+    echo "Usage: ${0##*/} <status|start|stop|help>"
+    echo
+    exit 1
+}
+
+###############################################################################
+# internal functions
+###############################################################################
+
+# checks whether IP forwarding is enabled or not.
+# returns 0 if it is, 1 if not.
+function is_loaded {
+    if [ -e /proc/sys/net/ipv4/ip_forward ]; then
+	test "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" == "1"
+	return $?
+    else
+	return 1
+    fi
+}
+
+# Enables ip forwarding. Returns 0 on success.
+function enable_forwarding {
+    echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null
+}
+
+# Disables ip forwarding. Returns 0 on success.
+function disable_forwarding {
+    echo 0 > /proc/sys/net/ipv4/ip_forward 2>/dev/null
+}
+
+# checks wether the firewall modules are loaded
+function do_status {
+    if is_loaded; then
+	    echo "IP forwarding is enabled."
+	    return 0
+    fi
+    echo "IP forwarding is disabled."
+    return 1
+}
+
+# Starts the "service"
+function do_start {
+    echo -n "Enabling IP forwarding... "
+    if enable_forwarding; then
+	echo "OK."
+	return 0
+    else
+	echo "Failed."
+	return 1
+    fi
+}
+
+# Stops the "service"
+function do_stop {
+    echo -n "Disabling IP forwarding... "
+    if disable_forwarding; then
+	echo "OK."
+	return 0
+    else
+	echo "Failed."
+	return 1
+    fi
+}
+
+load_config
