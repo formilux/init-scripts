@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ "$1" = "complete" ]; then
+  compgen -W "help status start stop restart check list_options" "$2"
+  exit 0
+fi
+
 . `dirname $0`/functions
 
 function do_help {
