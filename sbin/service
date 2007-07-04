@@ -1,8 +1,78 @@
 #!/bin/bash
+SERVICE_STATUS_DIR=/var/state/service
+
 
 svc="$1" ; shift
 if [ ! -x "/sbin/init.d/$svc" ]; then
   echo "Service not found : $svc"
   exit 1
 fi
-exec "/sbin/init.d/$svc" "$@"
+
+if [ ! -d "$SERVICE_STATUS_DIR" ] ; then
+	mkdir -p "$SERVICE_STATUS_DIR"
+fi
+
+# dependencies case network restart -> vrrp stop/start
+if [ "$svc" = "network" -a "$1" = "restart" ] ; then
+	vrrp_run=0
+	service "vrrp" "status"
+	if [ "$?" = "0" ] ; then
+		vrrp_run=1
+	fi
+
+	if [ vrrp_run -eq 1 ] ; then
+		service "vrrp" "stop"
+	fi
+
+	/sbin/init.d/$svc "$@"
+	ret="$?"
+	if [ "$ret" = "0" ] ; then
+		rm -f "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+	fi
+
+	if [ vrrp_run -eq 1 ] ; then
+		service "vrrp" "start"
+	fi
+
+	exit $ret
+fi
+
+# management on apply cache
+case "$1" in
+	restart|reload|start)
+			/sbin/init.d/$svc "$@"
+			ret="$?"
+			if [ "$ret" = "0" ] ; then
+				if [ "$svc" = "haproxy" ] ; then
+					exit $ret
+				fi
+				rm -f "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+			fi
+			exit $ret
+			;;
+	apply)
+			/sbin/init.d/$svc "$@"
+			ret="$?"
+			if [ "$ret" = "0" ] ; then
+				rm -f "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+			fi
+			exit $ret
+			;;
+	setsec|setconf)
+			/sbin/init.d/$svc "$@"
+			ret="$?"
+			if [ "$ret" = "0" ] ; then
+				touch "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+			fi
+			exit $ret
+			;;
+	needapply)
+			if [ -e "$SERVICE_STATUS_DIR/$svc$2.apply" ] ; then
+				exit 0
+			fi
+			exit 1
+			;;
+	*)
+			exec "/sbin/init.d/$svc" "$@"
+			;;
+esac
