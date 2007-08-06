@@ -20,7 +20,7 @@ if [ "$svc" = "network" -a "$1" = "restart" ] ; then
 		vrrp_run=1
 	fi
 
-	if [ vrrp_run -eq 1 ] ; then
+	if [ $vrrp_run -eq 1 ] ; then
 		service "vrrp" "stop"
 	fi
 
@@ -30,7 +30,7 @@ if [ "$svc" = "network" -a "$1" = "restart" ] ; then
 		rm -f "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
 	fi
 
-	if [ vrrp_run -eq 1 ] ; then
+	if [ $vrrp_run -eq 1 ] ; then
 		service "vrrp" "start"
 	fi
 
