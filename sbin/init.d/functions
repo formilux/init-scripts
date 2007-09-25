@@ -858,13 +858,13 @@ function load_config {
     fi
 
     if [ "$SVC_FOUND" != 1 -a "$MUST_LIST_SECTIONS" != 1 ]; then
-	echo "Service/instance not found in $CONFIG, using default values."
+	echo "Warning: service/instance not found in $CONFIG, using default values."
 	service $PNAME ; service ""
 
         #[ "x$G_FACILITY" != x ] && \
         #   logger -p $G_FACILITY.warn -t "flxi[$$].$PNAME" -- \
         #     "unknown[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
-	exit 1
+	#exit 1
     fi
     return $STATUS_RET
 }
