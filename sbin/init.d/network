@@ -44,6 +44,8 @@ option	duplex		standard_option
 option	speed		standard_option
 option	auto		standard_option
 option	slave		multiple_option
+option	bridge		multiple_option
+option	bridge_stp	boolean_option	0
 option	sysctl		multiple_option
 option	modprobe 	multiple_option
 option	lladdr		standard_option
@@ -64,10 +66,9 @@ function do_help {
     echo
     echo "   - ip addr <address>, arp <ip> <mac>|pub, dhcp, route <dest> <-|gw> [<args>]"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx}"
-    echo "   - duplex {half|full}"
-    echo "   - speed  {10|100|1000}"
-    echo "   - auto   {on|off}"
+    echo "   - duplex {half|full} ; speed {10|100|1000} ; auto {on|off}"
     echo "   - slave  <interface*>"
+    echo "   - bridge <interface*> ; bridge_stp {on|off}"
     echo "   - sysctl <var>=<val>"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
@@ -269,6 +270,23 @@ function do_start {
     done
     arg=0
 
+    # configure the bridge
+    if [ ${#opt_bridge[*]} -gt 0 ]; then
+	brctl addbr $instname
+	[ "${opt_bridge_stp}" == "1" ] && brctl stp $instname on
+        [ "${opt_bridge_stp}" != "1" ] && brctl setfd $instname 0
+	for arg in ${opt_bridge[*]}; do
+		if ! ( do_status $svcname $arg || \
+		       ip li set dev $arg up || \
+		       do_start $svcname $arg ) >/dev/null 2>&1; then
+		    echo "  ==> FAILED! need to start iface $arg before $instname"
+		else
+		    brctl addif $instname $arg >/dev/null 2>&1
+		    ip addr flush dev $arg >/dev/null 2>&1
+		fi
+	done
+    fi
+
     # Create the VLAN interface if it does not exist yet.
     if ! grep -qE "^[ 	]*($instname|$repl):" /proc/net/dev >/dev/null 2>&1; then
 	# A dot in an interface name means physical_if.vlanid
@@ -286,7 +304,7 @@ function do_start {
 	fi
     fi
 
-    ip link set "$repl" down >/dev/null 2>&1
+    [ ${#opt_bridge[*]} -gt 0 ] || ip link set "$repl" down >/dev/null 2>&1
     ip addr flush dev "$repl" >/dev/null 2>&1
 
     # Rename the interface if needed.
@@ -514,6 +532,15 @@ function do_stop {
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
     [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null
+
+    if [ ${#opt_bridge[*]} -gt 0 ]; then
+	for arg in ${opt_bridge[*]}; do
+	    do_status $svcname $arg && ip li set dev $arg down >/dev/null 2>&1
+            ip addr flush dev $arg >/dev/null 2>&1
+	    brctl delif $instname $arg >/dev/null 2>&1
+        done
+	brctl delbr $instname
+    fi
 
     arg=${#opt_modprobe[*]}
     while [ $arg -gt 0 ]; do
