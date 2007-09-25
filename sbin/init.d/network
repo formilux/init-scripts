@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # service network [<ifname>]       # interface name -> int_<ifname>=enable
+#     replace <old_if_name>
 #     ip address <ip/mask> [secondary]  # address for this interface 
 #     media {auto|full|fdx|100full|100fdx|half|hdx|100half|100hdx>
 #     speed {10|100|1000}
@@ -35,6 +36,7 @@ fi
 . `dirname $0`/functions
 
 option	ip		option_ip
+option	replace		standard_option
 option	usedhcphostname	boolean_option	0
 option	dhcptimeout	standard_option	10
 option	media		standard_option
@@ -69,7 +71,7 @@ function do_help {
     echo "   - sysctl <var>=<val>"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
-    echo "   - lladdr <mac_addr>"
+    echo "   - lladdr <mac_addr> ; replace <old_if_name>"
     echo "   - mtu <mtu> ; arp {on|off} ; multicast {on|off} ; shutdown"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp>"
     echo
@@ -166,6 +168,7 @@ function option_ip {
 function do_start {
     local svcname=$1
     local instname=$2
+    local repl
     local arg
 
     if [ -z "$instname" ]; then
@@ -231,6 +234,10 @@ function do_start {
 	return 0
     fi
 
+    # maybe we want to replace an interface (which may either exist or remain
+    # unloaded yet)
+
+    repl=${opt_replace:-$instname};
     arg=0
     while [ $arg -lt ${#opt_modprobe[*]} ]; do
 	if [ "${opt_modprobe[$arg]}" != "#" ]; then
@@ -240,7 +247,7 @@ function do_start {
 	    fi
 	else
 	    local err	# do not merge the assignment here, local sets $? to 0 !
-	    err=`modprobe $instname 2>&1`
+	    err=`modprobe $repl 2>&1`
 	    if [ $? -gt 0 ]; then
 		if ! grep -q "^[ 	]*$instname:" /proc/net/dev >/dev/null 2>&1; then
 		    echo "  ==> start $svcname[$instname] : modprobe $instname failed : $err. Trying anyway."
@@ -261,23 +268,34 @@ function do_start {
         arg=$[$arg+1]
     done
     arg=0
-	
-    # a dot in an interface name means physical_if.vlanid
-    # We have to create the interface now.
-    if [ -z "${instname//*.*/}" ]; then
-	arg=${instname%%.*}
-	if ! do_status $svcname $arg && ! do_start $svcname $arg >/dev/null 2>&1; then
-	    echo "  ==> FAILED! could not start slave $arg before $instname"
-	fi
-	vconfig add $arg ${instname#*.} >/dev/null
-	if [ $? -gt 0 ]; then
-	    echo "  ==> start $svcname${instname:+[$instname]} : Failed."
-	    return 1
+
+    # Create the VLAN interface if it does not exist yet.
+    if ! grep -qE "^[ 	]*($instname|$repl):" /proc/net/dev >/dev/null 2>&1; then
+	# A dot in an interface name means physical_if.vlanid
+	# We have to create the interface now.
+	if [ -z "${repl//*.*/}" ]; then
+	    arg="${repl%%.*}"
+	    if ! do_status "$svcname" "$arg" && ! do_start "$svcname" "$arg" >/dev/null 2>&1; then
+		echo "  ==> FAILED! could not start slave $arg before $instname"
+	    fi
+	    vconfig add "$arg" "${repl#*.}" >/dev/null
+	    if [ $? -gt 0 ]; then
+		echo "  ==> start $svcname${instname:+[$instname]} : Failed."
+		return 1
+	    fi
 	fi
     fi
 
-    ip link set $instname down >/dev/null 2>&1
-    ip addr flush dev $instname >/dev/null 2>&1
+    ip link set "$repl" down >/dev/null 2>&1
+    ip addr flush dev "$repl" >/dev/null 2>&1
+
+    # Rename the interface if needed.
+    if [ "$repl" != "$instname" ] && \
+       ! grep -q "^[ 	]*$instname:" /proc/net/dev >/dev/null 2>&1 && \
+	 grep -q "^[ 	]*$repl:" /proc/net/dev >/dev/null 2>&1; then
+	# if the interface appears with the old name, rename it now
+	ip li set "$repl" name "$instname"
+    fi
 
     # We do this to bind IPv4 immediately to this interface.
     # It's problematic with the 'lo' device because bringing it up with IPv4
