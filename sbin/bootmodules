@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# sbin/bootmodules - Formilux early modules loader - v0.1 - 2006-06-30
+#
+# Copyright (C) 2001-2006 Benoit Dolez & Willy Tarreau
+#       mailto: benoit@ant-computing.com,willy@ant-computing.com
+#
+# This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
+
+# This script looks for strings beginning with 'load=' in /proc/modules.
+# It accepts modules lists of the form :
+# module_name[:arg=value[,value]*]*[;module_name[:....]]
+
+args=( $(< /proc/cmdline) )
+
+argn=0
+while [ $argn -lt ${#args[@]} ]; do
+  arg="${args[argn]}"
+  ((argn++))
+  [ -n "${arg##load=*}" ] && continue;
+  arg="${arg#load=}"
+  while [ -n "$arg" ]; do
+    str="${arg%%;*}"
+    arg="${arg#$str}"; arg="${arg#;}"
+    str="${str//:/ }"
+    if [ -n "$str" ]; then
+      echo "# Loading module '${str%% *}' from kernel command line..."
+      /sbin/modprobe ${str//:/ }
+    fi
+  done
+done

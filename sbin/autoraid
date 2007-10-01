@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# /sbin/autoraid - Formilux RAID starter - v0.1 - 2006-07-03
+#
+# Copyright (C) 2001-2006 Benoit Dolez & Willy Tarreau
+#       mailto: benoit@ant-computing.com,willy@ant-computing.com
+#
+# This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
+
+# This script looks for *real* partitions in /proc/partitions (those belonging
+# to another device) and passes their names to mdadm to startt he RAID devices.
+# This operation can be bound to one disk only if needed by passing its name on
+# the command line.
+
+MDADM=/sbin/mdadm
+
+usage() {
+  echo "Usage: ${0##*/} [ disk ]"
+  echo "  Will start raid for all the partitions found in /proc/partitions,"
+  echo "  possibly limited to those attached to <disk>."
+  exit 1
+}
+
+if [ $# -gt 0 ]; then
+  [ "$1" == "-h" -o "$1" == "--help" ] && usage
+  disk="${1#/dev/}"
+  shift
+fi
+
+# Note: this script expects that the input file is sorted by device name,
+# or at least that the MBRs are ALWAYS before the partitions !
+
+list=( )
+while read maj min blo name stats; do
+  [ -n "$name" ] || continue
+  [ "$maj" != "major" ] || continue
+  [ "$name" != "$mbr" ] || continue
+
+  if [ -n "$mbr" -a -z "${name##$mbr*}" ]; then
+    [ -z "$disk" -o "$mbr" = "$disk" ] && list[${#list[@]}]="/dev/$name";
+  else
+    mbr="$name"
+  fi
+done </proc/partitions
+
+dev_list=( )
+$MDADM -Q "${list[@]}" 2>/dev/null | { \
+  while read dev dum1 num dum2 tot device dum4 type mddev rest; do
+    dev="${dev%:}"
+    mddev="${mddev%.}"
+    [ "$dum1" == "device" ] || continue
+    # we have dev and mddev. We'll look for an association in the dev_list
+    idx=0
+    while [ $idx -lt ${#dev_list[@]} ]; do
+      # try to reuse /dev/md entry
+      if [ -n "${dev_list[idx]}" -a -z "${dev_list[idx]##$mddev *}" ]; then
+        dev_list[idx]="${dev_list[idx]} $dev"
+        break;
+      fi
+      ((idx++))
+    done
+    # create a new entry
+    if [ $idx -ge ${#dev_list[@]} ]; then
+      dev_list[${#dev_list[@]}]="$mddev $dev"
+    fi
+  done
+  
+  idx=0
+  while [ $idx -lt ${#dev_list[@]} ]; do
+    $MDADM --assemble ${dev_list[idx]}
+    ((idx++))
+  done
+}
+
+exit 0

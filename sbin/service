@@ -1,0 +1,8 @@
+#!/bin/bash
+
+svc="$1" ; shift
+if [ ! -x "/sbin/init.d/$svc" ]; then
+  echo "Service not found : $svc"
+  exit 1
+fi
+exec "/sbin/init.d/$svc" "$@"

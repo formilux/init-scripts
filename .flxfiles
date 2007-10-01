@@ -24,6 +24,10 @@ sbin/rc.K
 sbin/rc.M
 sbin/rc.S
 sbin/initscript
+sbin/autoraid
+sbin/bootmodules
+sbin/listpart
+sbin/service
 etc/init.d
 etc/initscript
 etc/startup.rc

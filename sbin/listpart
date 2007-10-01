@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# reads input formated like /proc/partitions, and can output the list of
+# MBR devices which do have partitions and the list of those partitions.
+#
+# It should be used to discover RAID devices with mdadm this way :
+# mdadm --examine --scan $(/tmp/listpart.sh -p </proc/partitions ) /dev/null
+# (the /dev/null is there to avoid mdadm doing a full scan if no device is
+# reported).
+#
+# mdadm -Q $(/tmp/listpart.sh -p </proc/partitions ) | grep device | tr -d ':.'| awk '{print $9 FS $1}'|sort
+
+# Use "-m" [part] to list the MBRs which have partitions (or the one
+#   which has <part>).
+# Use "-p" [mbr] to list the partitions, or the partitions of <mbr>.
+
+usage() {
+  echo "Usage: ${0##*/} {-m|-p} [ part | mbr ] < /proc/partitions"
+  echo " - with '-m', will list the Master Boot Records found in the file"
+  echo "   and for which a partition exists, or partition <part> exists."
+  echo " - with '-p', will list the partitions found in the file, with the"
+  echo "   ability to filter only those attached to MBR <mbr>."
+  exit 1
+}
+
+if [ $# -gt 0 ]; then
+  arg1="$1"
+  [ "$arg1" == "-m" -o "$arg1" == "-p" ] || usage
+  shift
+else
+  usage
+fi
+
+if [ $# -gt 0 ]; then arg2="${1#/dev/}";  shift; fi
+
+# Note: this script expects that the input file is sorted by device name,
+# or at least that the MBRs are ALWAYS before the partitions !
+
+while read maj min blo name stats; do
+  [ -n "$name" ] || continue
+  [ "$maj" != "major" ] || continue
+  [ "$name" != "$mbr" ] || continue
+
+  if [ -n "$mbr" -a -z "${name##$mbr*}" ]; then
+    [ "$arg1" = "-m" ] && [ -z "$arg2" -o "$name" = "$arg2" ] && partfound=1
+    [ "$arg1" = "-p" ]&&[ -z "$arg2" -o "$mbr" = "$arg2" ] && echo "/dev/$name"
+  else
+    [ -n "$mbr" -a "$arg1" = "-m" -a "$partfound" == "1" ] && echo "/dev/$mbr"
+    partfound=0
+    mbr="$name"
+  fi
+done
+[ -n "$mbr" -a "$arg1" = "-m" -a "$partfound" == "1" ] && echo "/dev/$mbr"
+exit 0
