@@ -23,14 +23,14 @@ if [ "$1" = "-c" ]; then shift; set -- $*; fi
 # Configuration file to use. Default : /etc/config.rc
 export CONFIG=${CONFIG:-/etc/config.rc}
 
-# Path to startup scripts. Default : /sbin/init.d
-# INIT_PATH=${INIT_PATH:-/sbin/init.d}
-INIT_PATH=${INIT_PATH:-`dirname $0`}
-
 # Process name
 PNAME=`basename $0`
 PPATH=`dirname $0`
 PFULLNAME=$0
+
+# Path to startup scripts. Default : /sbin/init.d
+# INIT_PATH=${INIT_PATH:-/sbin/init.d}
+INIT_PATH=${INIT_PATH:-$PPATH}
 
 # Global variable for status information. Set to "1" while processing the right
 # section.
@@ -100,7 +100,7 @@ function logit {
 # usage: valueof CONFIGFILE PARAMETER
 function valueof {
     if [ -e "$1" ]; then
-        REPLY=$(grep $'^[ \t]*'"$2"'[:= \t]*' $1|sed s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,')
+        REPLY=$(sed -ne s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,'p "$1")
     else
         REPLY=
     fi
@@ -644,9 +644,9 @@ function build_default_func {
     [ -f $file ] || return 1 
     # undefine all previously defined functions
     for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
-    DEFINED_FUNCTIONS=`awk '{gsub("#.*", "", $1); \
-                           if (match($1, "^[a-zA-Z0-9][a-zA-Z0-9_]*$")) \
-                           print $1 | "sort -u" }' $file `
+    DEFINED_FUNCTIONS=`awk '/^[ \t]*[a-zA-Z0-9][a-zA-Z0-9_]*/ \
+                           {gsub("#.*", "", $1); if (!x[$1]) \
+                           {print $1;x[$1]=1;}}' $file `
     # get all first words and build a default function
     for i in $DEFINED_FUNCTIONS ; do
 	if ! eval "declare -F $i > /dev/null" ; then 
