@@ -47,6 +47,16 @@ function do_date_from_hw {
 	hwclock --hctosys --noadjfile --localtime $rtc_opt
 	echo "Done."
     fi
+
+    # If a /usr/share/factory/version file exists and is newer than
+    # the system date, then the system date is wrong (dead battery?).
+    # Let's set the system date to the firmware's release date at least.
+
+    # To achieve this, we compare the start-date of a newly spawned process
+    # with the firmware date, and use the firmware date if appropriate.
+
+    "${SHELL:-sh}" -c '[ /proc/self/. -ot /usr/share/factory/version ] && date -s "$(date -r /usr/share/factory/version)" >/dev/null'
+
     return 0
 }
 
