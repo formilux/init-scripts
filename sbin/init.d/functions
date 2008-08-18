@@ -479,6 +479,26 @@ function do_stop {
     return 0
 }
 
+# reload only for started processes
+function do_reload_started {
+    
+    if [ "x$pidfile" != x ] ; then
+      kill -HUP $(<$pidfile)
+    else
+      do_restart "$@"
+
+    fi
+}
+
+# we just want to reload service, default reload action is to restart
+function do_reload {
+    if do_status "$@" >/dev/null 2>&1 ; then
+      do_reload_started "$@"
+    else
+      do_restart "$@"
+    fi
+}
+
 # we *absolutely* want to restart the service, even if it's frozen as "defunct"
 function do_restart {
     do_stop $* || ( FORCE_START_STOP=1 do_stop $* )
