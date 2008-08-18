@@ -257,7 +257,8 @@ function standard_option {
     if [ "x$2" = "x--disable" ]; then
 	eval "opt_$1="
     else
-	eval "opt_$1='$2'"
+	local name=$1 ; shift
+	eval "opt_$name='$*'"
     fi
 }
 
@@ -784,6 +785,7 @@ function default_service {
     if test "x$1" = "x$PNAME" -a \
 	    \( "x$2" = "x${SVC_INSTANCE[0]}" -o "x${SVC_INSTANCE[0]}" = "x" \) ; then
 	# we can test difference between SVC_ARGS and SVC_INSTANCE
+	local include_default=""
 	SVC_FOUND=1
 	RUNNING_SECTION=1
 	shift
@@ -805,6 +807,24 @@ function default_service {
 	    fi
 	    i=$[$i+1]
 	done
+
+	include_default="/etc/default/$PNAME${SVC_ARGS[0]:+.${SVC_ARGS[0]}}"
+	if [ -f "$include_default" ] ; then
+		local include_functions=""
+
+		include_functions=`awk '/^[ \t]*[a-zA-Z0-9][a-zA-Z0-9_]*/ \
+		                        {gsub("#.*", "", $1); if (!x[$1]) \
+		                        {print $1;x[$1]=1;}}' $include_default `
+		# get all first words and build a default function
+		for i in $include_functions ; do
+			if ! eval "declare -F $i > /dev/null" ; then
+				eval "function $i { default_config_option $i \$* ; } "
+				DEFINED_FUNCTIONS="$DEFINED_FUNCTIONS $i"
+			fi
+		done
+
+		. $include_default
+	fi
 
 	# now if the script defines a fct_begin_section() function, let's call
 	# it to preset some default values from external config files.
