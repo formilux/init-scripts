@@ -711,20 +711,46 @@ function default_service {
 	# it to fix some values, or extract som from external config files.
 	declare -F fct_end_section > /dev/null && fct_end_section $PNAME ${SVC_ARGS[*]}
 
-
+	ret=0
 	if [ "$SVC_AUTO_START" = 0 -o "$autostart" = 1 ]; then
 	    if declare -f do_$ACTION >/dev/null; then
-		do_$ACTION $PNAME ${SVC_ARGS[*]}
+		case $ACTION in
+			getsec|getconf|setsec|setconf|checkconf|checksec|testsec)
+				if [ "x${SVC_INSTANCE[0]}" = "x" ] ; then
+				# if no instances in args, execute do_$ACTION
+				# only one time for those actions
+					do_$ACTION $PNAME 
+					ret=$?
+					unset -f do_$ACTION
+				else
+				# else process as std case
+					do_$ACTION $PNAME ${SVC_ARGS[*]}
+					ret=$?
+				fi
+				;;
+			*) 
+				# std case
+				do_$ACTION $PNAME ${SVC_ARGS[*]}
+				ret=$?
+				;;
+		esac
+
 	    else
-		if declare -f do_help >/dev/null; then
-		    do_help
-		else
-		    echo "Error: Unknown action : $ACTION"
-		fi
-		((0))  # report an error
+		case $ACTION in
+			getsec|getconf|setsec|setconf|checkconf|checksec|testsec) ;;
+			*)
+				if declare -f do_help >/dev/null; then
+				    	do_help
+				else
+		   			echo "Error: Unknown action : $ACTION"
+				fi
+				((0))  # report an error
+				ret=$?
+				;;
+		esac
 	    fi
 	fi
-	ret=$?
+
 	if [ $ret -gt 0 ]; then
 	    STATUS_RET=$ret
 	fi
@@ -786,6 +812,370 @@ function default_service {
 	declare -F fct_begin_section > /dev/null && fct_begin_section $PNAME ${SVC_ARGS[*]}
     fi
 }
+
+# Prepare section(s) for edit 
+function fct_pre_getsec {
+	local svc=$1;
+        local instance=$2;
+
+	(
+	local print=0
+	
+	while : ; do
+		read
+		eof=$?
+		[ "$eof" != "0" ] && [ -z "$REPLY" ] && break
+
+		set -- $REPLY	
+		[ "$1" = "no" ] && shift ;
+		
+                if [ "$1" = "service" ] ; then
+			print=0
+			if [ -n "$instance" ] ; then
+				[ "$2" = "$svc" -a "$3" = "$instance" ] && print=1
+			else
+				[ "$2" = "$svc" ] && print=1
+			fi
+                fi
+		[ $print -eq 1 ] && echo "$REPLY"
+
+		[ "$eof" != "0" ] && echo ""
+
+        done 
+	exit 0 ) < $CONFIG > $EDIT_TMPSEC
+
+	if [ "$?" != "0" ] ; then
+		rm -f "$EDIT_TMPSEC" >/dev/null 2>&1
+		return 1
+	fi
+
+        return 0
+}
+
+
+
+# Insert edited section(s) 
+function fct_post_setsec {
+	local svc=$1;
+        local instance=$2;
+
+        (
+        local print=1
+	local found=0
+
+        while : ; do
+               
+		read
+		eof=$?
+		[ "$eof" != "0" ] && [ -z "$REPLY" ] && break 
+		set -- $REPLY
+                [ "$1" = "no" ] && shift ;
+
+                if [ "$1" = "service" ] ; then
+                        print=1
+                        if [ -n "$instance" -a $found -eq 0 ] ; then
+                                if [ "$2" = "$svc" -a "$3" = "$instance" ] ; then
+					cat "$EDIT_TMPSEC"
+					found=1
+					[ -n "$(tail -c 1 "$EDIT_TMPSEC")" ] && echo ""
+					print=0
+				fi
+                        elif [ $found -eq 0 ] ; then 
+                                if [ "$2" = "$svc" ] ; then
+					cat "$EDIT_TMPSEC"
+					found=1
+					[ -n "$(tail -c 1 "$EDIT_TMPSEC")" ] && echo ""
+					print=0
+				fi
+                        elif [ -z "$instance" ] ; then
+				if [ "$2" = "$svc" ] ; then
+					print=0
+				fi
+			fi
+                fi
+                [ $print -eq 1 ] && echo "$REPLY"
+		# config rc need returns on last line
+		[ "$eof" != "0" ] && echo ""
+
+        done 
+	exit 0 ) < $CONFIG >$CONFIG.new	       
+
+	if [ "$?" != "0" ] ; then
+		rm -f $CONFIG.new >/dev/null 2>&1
+	fi
+
+	mv "$CONFIG.new" "$CONFIG"
+
+        return 0
+}
+
+# Dump section(s) for edit
+function do_getsec {
+	local p=$1
+	local instance=$2
+
+	
+	if [ ! -e "$EDIT_TMPSEC" ] ; then
+ 		fct_pre_getsec "$p" "$instance"
+		[ "$?" != 0 ] && return 1
+	fi
+	
+	[ ! -e "$EDIT_TMPSEC" ] && return 1
+	cat "$EDIT_TMPSEC"
+
+	return 0;
+}
+
+# Test edited section
+function fct_post_checksec {
+	local p=$1
+	local instance=$2
+
+	( $INIT_PATH/$p -f $EDIT_TMPSEC testsec $instance >&2 )
+	[ "$?" != "0" ] && return 1
+
+	return 0
+}
+
+# Update and test edited section
+function do_checksec {
+	local p=$1
+	local instance=$2
+	local length=0
+	local test;
+	if [ ! -t 0 ] ; then
+              eval $(
+                        IFS=""
+                        header="Content-length: "
+                        while read line; do
+                                if [ -z "$line" ] ; then
+                                        exit 0
+                                elif [ "${line:0:${#header}}" = "$header" ] ; then
+                                        echo -ne "length=${line:${#header}}; "
+                                fi
+                        done
+                        exit 0
+               )
+		
+               if [ $length -gt 0 ] ; then
+                        cat > "$EDIT_TMPSEC"
+               fi
+
+	fi
+
+	[ ! -e "$EDIT_TMPSEC" ] && return 1
+
+	fct_post_checksec $p $instance
+	[ "$?" != "0" ] && return 1
+	
+	return 0 
+}
+
+# Update test and insert edited section(s) 
+function do_setsec {
+	local p=$1
+        local instance=$2
+        local length=0
+        local test;
+
+	do_checksec $1 $2
+	[ "$?" != "0" ] && return 1 
+		
+	fct_post_setsec $p $instance 
+	[ "$?" != "0" ] && return 1 
+
+	rm -f "$EDIT_TMPSEC" 2>/dev/null 2>&1
+
+	return 0
+}
+
+# Cancel section(s) edit
+function do_cancelsec {
+	
+	rm -f "$EDIT_TMPSEC" 2>/dev/null 2>&1
+
+	return 0
+}
+
+# function to test sections on -f <config>
+# unknown option for service or other services are reported as errors
+function do_testsec {
+	local svc=$1
+	local instance=$2
+
+        for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
+	i=0 
+	while [ $i -lt $svc_nbopts ]; do
+         	eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "	
+  		i=$[$i+1]
+	done
+
+	eval "function service { [ "x\$1" != "x$svc" ] && return 1 ; [ "x$instance" != "x" -a "x$instance" != "x\$2" ] && return 1 ; return 0 ; } "
+
+	(
+	  local func
+    	  local found=0
+ 
+          while : ; do
+
+		read
+		[ "$?" != "0" ] && [ -z "$REPLY" ] && break
+		set -- $REPLY
+
+       		if [ -n "$1" -a "${1:0:1}" != "#" ] ; then
+	
+			[ "$1" = "no" ] && shift ;
+			func="$1" ; shift;
+
+			if [ "$IGNORE_OTHERS" = "" ] ; then
+			# control if first work correspond to function
+				if ! eval "declare -F $func >/dev/null" ; then
+					echo "Error: invalid line $REPLY"
+					return 1
+				fi
+
+				# control first is service
+				[ "$func" = "service" ] && found=1
+				if [ $found -eq 0 ] ; then
+					echo "Error: invalid line $REPLY"
+					return 1
+				fi
+			
+				# execute function	
+				$func $@
+				if [ $? -ne 0 ] ; then
+					echo "Error: invalid line  $REPLY"
+					return 1
+				fi
+			else
+				if [ "$func" = "service" ] ; then
+					[ $found -eq 1 ] && return 0
+					$func $@
+					[ $? -eq 0 ] && found=1
+				fi
+
+				if [ $found -eq 1 ] ; then
+					if ! eval "declare -F $func >/dev/null" ; then
+						echo "Error: invalid line $REPLY"
+						return 1
+					fi
+
+					$func $@
+	                                if [ $? -ne 0 ] ; then
+        	                                echo "Error: invalid line  $REPLY"
+                	                        return 1
+                        	        fi
+				fi
+			fi
+				
+		fi
+	 done
+        ) <$CONFIG
+  
+    [ "$?" != "0" ] && exit 1 
+
+    exit 0 
+
+}
+
+# Prepare configuration for edit
+function fct_pre_getconf {
+
+	[ -z "$opt_config" -o ! -e "$opt_config" ] && return 1
+
+	cat "$opt_config" > "$EDIT_TMPCNF"
+	
+	return 0
+}
+
+# Dump configuration for edit 
+function do_getconf {
+	local p=$1
+	local instance=$2
+
+	if [ ! -e "$EDIT_TMPCNF" ] ; then	
+      		fct_pre_getconf "$p" "$instance"
+		[ $? -gt 0 ] && return 1
+
+	fi
+	
+	[ ! -e "$EDIT_TMPCNF" ] && return 1
+	cat "$EDIT_TMPCNF"
+
+	return 0
+}
+
+# Update and test edited configuration
+function do_checkconf {
+	local p=$1
+	local instance=$2
+	local length=0
+
+	if [ ! -t 0 ] ; then
+              eval $(
+                        IFS=""
+                        header="Content-length: "
+                        while read line; do
+                                if [ -z "$line" ] ; then
+                                        exit 0
+                                elif [ "${line:0:${#header}}" = "$header" ] ; then
+                                        echo -ne "length=${line:${#header}}; "
+                                fi
+                        done
+                        exit 0
+               )
+
+               if [ $length -gt 0 ] ; then
+                        cat > "$EDIT_TMPCNF"
+               fi
+
+        fi
+	
+	[ ! -e "$EDIT_TMPCNF" ] && return 1
+
+
+	ret=0
+        declare -F fct_post_checkconf >/dev/null && { fct_post_checkconf $p $instance ; ret=$?; }
+
+	return $ret 
+}
+
+# Cancel configuration edit
+function do_cancelconf {
+
+	rm -f "$EDIT_TMPCNF" 2>/dev/null 2>&1
+
+	return 0
+}
+
+# Commit edited configuration
+function fct_post_setconf {
+
+	[ -z "$opt_config" ] && return 1
+
+	mv "$EDIT_TMPCNF" "$opt_config"
+
+	return 0
+}
+
+# Update test and commit edited configuration
+function do_setconf {
+	
+	local p=$1
+        local instance=$2
+        local length=0
+
+	do_checkconf $p $instance
+	[ "$?" != "0" ] && return 1
+
+        fct_post_setconf $p $instance
+	[ "$?" != "0" ] && return 1
+
+	rm -f "$EDIT_TMPCNF" >/dev/null 2>&1
+
+	return 0
+}
+
 
 # 'no' for 'no ... ', disable a service or an option
 function default_no {
@@ -935,6 +1325,11 @@ ACTION=${1:-start}; shift
 
 # Assign the requested instances to SVC_INSTANCE. Default : ""
 SVC_INSTANCE=( $* )
+
+# Edition buffer path
+EDIT_TMPDIR="/tmp"
+EDIT_TMPSEC=$EDIT_TMPDIR/$PNAME${SVC_INSTANCE[0]}.sec
+EDIT_TMPCNF=$EDIT_TMPDIR/$PNAME${SVC_INSTANCE[0]}.conf
 
 # most services don't need to redefine the keywords "bin", "cmdline",
 # "pidfile", "procname" and "check_interval", so let's initialize them now.
