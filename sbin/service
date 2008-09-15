@@ -50,7 +50,7 @@ case "$1" in
 			fi
 			exit $ret
 			;;
-	apply|revert)
+	apply|cancel|revert)
 			/sbin/init.d/$svc "$@"
 			ret="$?"
 			if [ "$ret" = "0" ] ; then
