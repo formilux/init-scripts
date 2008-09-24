@@ -286,6 +286,17 @@ function reserved_option {
     fi
 }
 
+# builtin function to create a boolean variable from an option.
+# The variable name is the same as the option name.
+# This is mainly used for reserved options such as "autostart".
+function reserved_bool_option {
+    if [ "x$2" = "x--disable" ]; then
+	eval "$1=0"
+    else
+	eval "$1=1"
+    fi
+}
+
 # builtin function to create a variable from an option.
 # The variable name is "opt_$option" where option is the option name.
 function long_option {
@@ -602,6 +613,7 @@ function do_list_options {
 	    if [ "${svc_fcts[$i]}" = "boolean_option" -o \
 		 "${svc_fcts[$i]}" = "standard_option" -o \
 		 "${svc_fcts[$i]}" = "long_option" -o \
+		 "${svc_fcts[$i]}" = "reserved_bool_option" -o \
 		 "${svc_fcts[$i]}" = "reserved_option" ]; then
 		    eval eval echo $inst ${svc_opts[$i]} \$"${svc_vars[$i]}"
 	    elif [ "${svc_fcts[$i]}" = "multiple_option" ]; then
@@ -645,7 +657,8 @@ function option {
     if [ "x$fct" = "xboolean_option" -o "x$fct" = "xstandard_option" -o \
 	 "x$fct" = "xlong_option" -o "x$fct" = "xmultiple_option" ]; then
 	svc_vars[$opt]=opt_$name
-    elif [ "x$fct" = "xreserved_option" ]; then
+    elif [ "x$fct" = "xreserved_option" -o \
+           "x$fct" = "xreserved_bool_option" ]; then
 	svc_vars[$opt]=$name
     else
 	svc_vars[$opt]=""
@@ -1379,7 +1392,7 @@ option	cmdline		reserved_option '$bin'
 option	pidfile		reserved_option
 option	procname	reserved_option
 option	check_interval	reserved_option	0
-option	autostart	reserved_option	1
+option	autostart	reserved_bool_option	1
 
 return 0
 
