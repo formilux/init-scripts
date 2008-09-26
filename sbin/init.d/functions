@@ -156,6 +156,11 @@ function daemon {
     setsid "$@" </dev/null >&0 2>&0 &
 }
 
+# run command "$1" with $2=/dev/fd/XX on stdin.
+run_stdin() {
+	$1 <&${2##*/}
+}
+
 ######################
 # EXPORTED FUNCTIONS #
 ######################
@@ -1282,10 +1287,8 @@ function default_no {
     esac
 }
 
-# warning: we need to close both stdin and the config fd in the eval
-# otherwise an external command might eat our config during the eval.
+# parse the config parts passed on stdin
 parse_cfg() {
-	local fd=${1##*/}
 	local name res
 	while read REPLY 2>/dev/null; do
 		[ -n "$REPLY" ] || continue
@@ -1297,7 +1300,7 @@ parse_cfg() {
 		else
 		    echo "Bad option '$1' in '$REPLY'"
 		fi
-	done <&$fd
+	done
 }
 
 # source configuration file, called last.
@@ -1325,7 +1328,7 @@ function load_config {
 	# first keywords out of a section space are for the system, so let's enter
 	# automatically in system section.
 	service system
-	parse_cfg <(awk -v pname="$PNAME" -v inst="$SVC_INSTANCE" '\
+	run_stdin parse_cfg <(awk -v pname="$PNAME" -v inst="$SVC_INSTANCE" '\
 		    BEGIN{ if (pname=="system") inside=1} {\
 		    if (substr($1,0,1)=="#") next;if ($1=="service") {\
 		      if ((pname==$2 || pname=="") && (inst==$3 || inst=="")) inside=1; else inside=0;}
