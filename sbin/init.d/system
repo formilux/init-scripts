@@ -153,24 +153,39 @@ function do_check {
     echo "$HOSTNAME $svcname.$instname $(date +%s) RUNNING ${uptime%%.*} OK"
 }
 
-function fct_post_setconf {
-	[ ! -e "$EDIT_TMPCNF" ] && return 1
-	cat "$EDIT_TMPCNF" > "$CONFIG"
+function do_setconf {
+	local pname=$1
+	local instance=$2
+	local tmpconfig="/tmp/$pname${instance:+.$instance}.conf"
+
+	do_checkconf $1 $2 || return 1
+
+	cat "$tmpconfig" > "$CONFIG"
+	rm -f "$tmpconfig"
 	return 0
 }
 
 
 # dump sections from config
-function fct_pre_getconf {
-	cat "$CONFIG" > "$EDIT_TMPCNF"
+function do_getconf {
+	local pname=$1
+	local instance=$2
+	local tmpconfig="/tmp/$pname${instance:+.$instance}.conf"
+
+	[ -e "$tmpconfig" ] && cat "$tmpconfig" && return 0
+	cat "$CONFIG"
 	return 0
 }
 
 function fct_post_checkconf {
-	/sbin/init.d/functions -f $EDIT_TMPCNF --list_sections | (
+	local pname=$1
+	local instance=$2
+	local tmpconfig="$3"
+
+	/sbin/init.d/functions -f "$tmpconfig" --list_sections | (
 		ret="0"
 		while read svc rest ; do
-			IGNORE_OTHERS=1 $INIT_PATH/$svc -f $EDIT_TMPCNF testsec $rest >&2
+			IGNORE_OTHERS=1 $INIT_PATH/$svc -f "$tmpconfig" testsec $rest >&2
 			if [ "$?" != "0" ] ; then
 				ret="1"
 				break
