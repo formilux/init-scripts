@@ -704,7 +704,7 @@ default_service() {
 
 	# unset all functions which handle options to avoid conflicts with
 	# commands (eg: modprobe, ip ...)
-	unset ${svc_opts[*]}
+	unset -f ${svc_opts[*]}
 
 	declare -F set_vars > /dev/null && set_vars
 	# force a last eval on each reserved option so that they can refer to
