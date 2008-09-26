@@ -74,7 +74,7 @@ STATUS_RET=0
 ########################################
 #           BASIC FUNCTIONS            #
 ########################################
-function logit {
+logit() {
     # echo -n "'"
     # echo -n "$*" | sed -e "s/'/\\\\'/" -e "s/§/' '/g"
     # echo "'"
@@ -96,7 +96,7 @@ function logit {
 # [ \t]*<parameter>[:= \t]*<value>[#]*<comment>$
 
 # usage: valueof CONFIGFILE PARAMETER
-function valueof {
+valueof() {
     if [ -e "$1" ]; then
         REPLY=$(sed -ne s,'^\('$'[ \t]*'"$2"$'[ \t:=]*''\)\([^#]*\).*$,\2,'p "$1")
     else
@@ -107,7 +107,7 @@ function valueof {
 
 # returns children processes ids.
 # usage: getchild PID ...
-function childrenpid {
+childrenpid() {
     local found
     local pid=" $* "
 
@@ -124,7 +124,7 @@ function childrenpid {
 # If no process name is specified, all the parent's children are returned.
 # if "parent_pid" is empty, then the parent's pid is not checked.
 # svc_pidof [ -o "omit_pids*" ]* [ -p parent_pid ] [ PNAME ... ]
-function svc_pidof {
+svc_pidof() {
     local omit=x
     local ppid=1
     local comm
@@ -150,7 +150,7 @@ function svc_pidof {
 # and with all its I/O directed to /dev/null, to ensure that it will not
 # block a TTY if a lazy coder didn't think appropriate to close the file
 # descriptors before forking.
-function daemon {
+daemon() {
     setsid "$@" </dev/null >&0 2>&0 &
 }
 
@@ -170,7 +170,7 @@ run_stdin() {
 #   - 1 if it was already RW
 #   - 2 if it could not be remounted RW
 
-function remount_rw {
+remount_rw() {
    local root
    set -- $(df $1|tail +2)
    root=$6
@@ -195,7 +195,7 @@ function remount_rw {
 #   - 1 if it was already RO
 #   - 2 if it could not be remounted RO
 
-function remount_ro {
+remount_ro() {
    local root
    set -- $(df $1|tail +2)
    root=$6
@@ -214,7 +214,7 @@ function remount_ro {
 }
 
 # this will try to unload module $1 and all modules which depend on it
-function recursive_rmmod {
+recursive_rmmod() {
     local -a args
     local mod
 
@@ -250,7 +250,7 @@ function recursive_rmmod {
 
 # builtin function to create a variable from an option.
 # The variable name is "opt_$option" where option is the option name.
-function standard_option {
+standard_option() {
     if [ "x$2" = "x--disable" ]; then
 	eval "opt_$1="
     else
@@ -261,7 +261,7 @@ function standard_option {
 
 # builtin function to create a variable from an option.
 # The variable name is "opt_$option" where option is the option name.
-function boolean_option {
+boolean_option() {
     if [ "x$2" = "x--disable" ]; then
 	eval "opt_$1=0"
     else
@@ -275,7 +275,7 @@ function boolean_option {
 # or to port older startup scripts.
 # The option value is NOT evaluated now, which means that cmdline can refer to
 # $bin if properly quoted. Eg: cmdline '$bin -f $config'
-function reserved_option {
+reserved_option() {
     if [ "x$2" = "x--disable" ]; then
 	eval "$1="
     else
@@ -286,7 +286,7 @@ function reserved_option {
 # builtin function to create a boolean variable from an option.
 # The variable name is the same as the option name.
 # This is mainly used for reserved options such as "autostart".
-function reserved_bool_option {
+reserved_bool_option() {
     if [ "x$2" = "x--disable" ]; then
 	eval "$1=0"
     else
@@ -296,7 +296,7 @@ function reserved_bool_option {
 
 # builtin function to create a variable from an option.
 # The variable name is "opt_$option" where option is the option name.
-function long_option {
+long_option() {
     if [ "x$2" = "x--disable" ]; then
 	eval "opt_$1="
     else
@@ -311,7 +311,7 @@ function long_option {
 # The array is extended with all the args for each occurence of the option.
 # If no arg is given, the option is extended with a single dash '#' so that
 # we further know that it has been called.
-function multiple_option {
+multiple_option() {
     if [ "x$2" = "x--disable" ]; then
 	# in case of multiple_option, "no <option> <args>" only
 	# means that we don't want to add <args> to <option>,
@@ -337,7 +337,7 @@ function multiple_option {
 # usage : do_start process_name [instance_name]
 # if functions fct_pre_start() and fct_post_start() are defined, they will be
 # called just before and just after the cmdline.
-function do_start {
+do_start() {
     local p=$1
     local instname=$2
     local ret
@@ -366,7 +366,7 @@ function do_start {
 # usage : do_stop_with_pidfile pidfile [process_name [instance_name]]
 # if functions fct_pre_stop() and fct_post_stop() are defined, they will be
 # called just before and just after a successful kill sequence.
-function do_stop_with_pidfile {
+do_stop_with_pidfile() {
     local pid
     local pids
     local pidfile=$1
@@ -432,7 +432,7 @@ function do_stop_with_pidfile {
 # usage : do_stop process_name [instance_name]
 # if functions fct_pre_stop() and fct_post_stop() are defined, they will be
 # called just before and just after a successful kill sequence.
-function do_stop {
+do_stop() {
     local pname=$1
     local instname=$2
     local pid
@@ -488,7 +488,7 @@ function do_stop {
 }
 
 # reload only for started processes
-function do_reload_started {
+do_reload_started() {
     
     if [ "x$pidfile" != x ] ; then
       kill -HUP $(<$pidfile)
@@ -499,7 +499,7 @@ function do_reload_started {
 }
 
 # we just want to reload service, default reload action is to restart
-function do_reload {
+do_reload() {
     if do_status "$@" >/dev/null 2>&1 ; then
       do_reload_started "$@"
     else
@@ -508,7 +508,7 @@ function do_reload {
 }
 
 # we *absolutely* want to restart the service, even if it's frozen as "defunct"
-function do_restart {
+do_restart() {
     do_stop $* || ( FORCE_START_STOP=1 do_stop $* )
     do_start $*
 }
@@ -516,7 +516,7 @@ function do_restart {
 # returns a basic check of the service, an returns one line of info of the form:
 # <hostname> <service_name>.[instance_name] <date_in_secs>  {RUNNING|STOPPED}[,more_info] [{OK|CONFIG_CHANGED}]
 # returns 0 if running.
-function do_check {
+do_check() {
     local run_stat
     local status=OK
     local ret uptime=0
@@ -550,7 +550,7 @@ function do_check {
 # 2 if the pid doesn't exist anymore, 3 if it has been affected to another
 # process name. If the process is running, REPLY is set to its pid.
 # usage : do_status_with_pidfile pidfile [process_name [instance_name]]
-function do_status_with_pidfile {
+do_status_with_pidfile() {
     local pidfile=$1
     local pname=$2
     local instname=$3
@@ -576,7 +576,7 @@ function do_status_with_pidfile {
 # otherwise same as do_status_with_pidfile(). If the process is running, REPLY is
 # set to its pid.
 # usage : do_status process_name [instance_name]
-function do_status {
+do_status() {
     local pname=$1
     local instname=$2
     shift
@@ -597,7 +597,7 @@ function do_status {
 # are correctly resolved.
 # The output format is "process_name.[instance_name] option value"
 # usage : list_options process_name [instance_name]
-function do_list_options {
+do_list_options() {
     local i=0
     local occur=0
     local nbocc=0
@@ -634,7 +634,7 @@ function do_list_options {
 
 # maps an option to a function. Existing options are simply overridden.
 # usage: option option_name function_name [ defaults ]
-function option {
+option() {
     local name=$1
     local fct=$2
     local def=$3
@@ -666,7 +666,7 @@ function option {
 # default 'service' function.
 # Called as default_service svc_name [svc_instance] from load_config.
 # SVC_ARGS is set from the service command line, and is used at next one.
-function default_service {
+default_service() {
     local ret
     local opt
     local val
@@ -792,7 +792,7 @@ function default_service {
 	# map all options to their functions, and set default vars.
 	i=0
 	while [ $i -lt $svc_nbopts ]; do
-	    eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; }"
+	    eval "${svc_opts[$i]}() { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; }"
 	    if [ "${svc_vars[$i]}" ]; then
 		if [ "x${svc_fcts[$i]}" != "xmultiple_option" ]; then
 		    eval "${svc_vars[$i]}='${svc_defs[$i]}'"
@@ -814,7 +814,7 @@ function default_service {
 }
 
 # Prepare section(s) for edit 
-function fct_pre_getsec {
+fct_pre_getsec() {
 	local svc=$1;
         local instance=$2;
 
@@ -855,7 +855,7 @@ function fct_pre_getsec {
 
 
 # Insert edited section(s) 
-function fct_post_setsec {
+fct_post_setsec() {
 	local svc=$1;
         local instance=$2;
 
@@ -910,7 +910,7 @@ function fct_post_setsec {
 }
 
 # Dump section(s) for edit
-function do_getsec {
+do_getsec() {
 	local p=$1
 	local instance=$2
 
@@ -927,7 +927,7 @@ function do_getsec {
 }
 
 # Test edited section
-function fct_post_checksec {
+fct_post_checksec() {
 	local p=$1
 	local instance=$2
 
@@ -938,7 +938,7 @@ function fct_post_checksec {
 }
 
 # Update and test edited section
-function do_checksec {
+do_checksec() {
 	local p=$1
 	local instance=$2
 	local length=0
@@ -972,7 +972,7 @@ function do_checksec {
 }
 
 # Update test and insert edited section(s) 
-function do_setsec {
+do_setsec() {
 	local p=$1
         local instance=$2
         local length=0
@@ -990,7 +990,7 @@ function do_setsec {
 }
 
 # Cancel section(s) edit
-function do_cancelsec {
+do_cancelsec() {
 	
 	rm -f "$EDIT_TMPSEC" 2>/dev/null 2>&1
 
@@ -999,17 +999,17 @@ function do_cancelsec {
 
 # function to test sections on -f <config>
 # unknown option for service or other services are reported as errors
-function do_testsec {
+do_testsec() {
 	local svc=$1
 	local instance=$2
 
 	i=0 
 	while [ $i -lt $svc_nbopts ]; do
-         	eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "	
+         	eval "${svc_opts[$i]}() { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; }"	
   		i=$[$i+1]
 	done
 
-	eval "function service { [ "x\$1" != "x$svc" ] && return 1 ; [ "x$instance" != "x" -a "x$instance" != "x\$2" ] && return 1 ; return 0 ; } "
+	eval "service() { [ "x\$1" != "x$svc" ] && return 1 ; [ "x$instance" != "x" -a "x$instance" != "x\$2" ] && return 1 ; return 0 ; } "
 
 	(
 	  local func
@@ -1078,7 +1078,7 @@ function do_testsec {
 }
 
 # Prepare configuration for edit
-function fct_pre_getconf {
+fct_pre_getconf() {
 
 	[ -z "$opt_config" -o ! -e "$opt_config" ] && return 1
 
@@ -1088,7 +1088,7 @@ function fct_pre_getconf {
 }
 
 # Dump configuration for edit 
-function do_getconf {
+do_getconf() {
 	local p=$1
 	local instance=$2
 
@@ -1105,7 +1105,7 @@ function do_getconf {
 }
 
 # Update and test edited configuration
-function do_checkconf {
+do_checkconf() {
 	local p=$1
 	local instance=$2
 	local length=0
@@ -1140,7 +1140,7 @@ function do_checkconf {
 }
 
 # Cancel configuration edit
-function do_cancelconf {
+do_cancelconf() {
 
 	rm -f "$EDIT_TMPCNF" 2>/dev/null 2>&1
 
@@ -1148,7 +1148,7 @@ function do_cancelconf {
 }
 
 # Commit edited configuration
-function fct_post_setconf {
+fct_post_setconf() {
 
 	[ -z "$opt_config" ] && return 1
 
@@ -1158,7 +1158,7 @@ function fct_post_setconf {
 }
 
 # Update test and commit edited configuration
-function do_setconf {
+do_setconf() {
 	
 	local p=$1
         local instance=$2
@@ -1177,7 +1177,7 @@ function do_setconf {
 
 
 # 'no' for 'no ... ', disable a service or an option
-function default_no {
+default_no() {
     local req=$1
     shift
     case "$req" in
@@ -1240,7 +1240,7 @@ parse_cfg() {
 }
 
 # source configuration file, called last.
-function load_config {
+load_config() {
     # defines functions for all first words in the config file
     res_kwd_no=1
     res_kwd_service=1
@@ -1248,10 +1248,10 @@ function load_config {
     res_kwd_interface=1
 
     # defines functions for reserved keywords: no, service, section, interface.
-    function no { default_no $*; }
-    function service { default_service $*; }
-    function section { default_service $*; }
-    function interface {
+    no() { default_no $*; }
+    service() { default_service $*; }
+    section() { default_service $*; }
+    interface() {
 	if [ "$PNAME" = "network" ]; then
 	    echo "Warning: use of 'interface $1' keyword is deprecated. Use 'section network $1' instead.";
 	fi
