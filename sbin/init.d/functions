@@ -8,13 +8,8 @@
 #
 # This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
 
-# not used ? ## DEBUG FILE
-# not used ? #DEBUG=/tmp/.flx.$PID.$RANDOM
-# not used ? #[ -e "$DEBUG" ] && rm -f $DEBUG && touch $DEBUG
-# not used ? #if [ $? != 0 ] ; then DEBUG="" ; fi
-
 # Test for previous sourcing already in progress
-declare -F build_default_func > /dev/null && return
+declare -F reserved_bool_option > /dev/null && return
 
 # SSHD starts this script with "-c" followed by all the parameters grouped into
 # one single string. So we expand it to allow remote commands.
@@ -38,9 +33,6 @@ RUNNING_SECTION=
 
 # goes "1" if at least one instance of the required service has been found
 SVC_FOUND=
-
-# no particular function defined yet
-DEFINED_FUNCTIONS=
 
 # not in list mode
 MUST_LIST_SECTIONS=
@@ -249,12 +241,6 @@ function recursive_rmmod {
 
 # All functions handling options get the option name as a first argument,
 # then the rest of the line follows.
-
-# default function for config directive. This one is called only for unmapped
-# options, so either bad ones or unused services.
-function default_config_option {
-    [ "$RUNNING_SECTION" ] && echo "Bad option '$1' in '$*'"
-}
 
 # builtin function to create a variable from an option.
 # The variable name is "opt_$option" where option is the option name.
@@ -669,35 +655,6 @@ function option {
     else
 	svc_vars[$opt]=""
     fi
-
-    #eval "function $1 { $2 $1 \$* ; }"
-}
-
-# This function is called once at load time. It scans the config file for all
-# referenced options, and assigns them to a quiet function which yells only
-# an unknown option has been referenced in a requested section. The options are
-# discovered by reading all the first words.
-#
-# usage: build_default_func config_file
-function build_default_func {
-    local file=$1
-    [ -f $file ] || return 1 
-    # undefine all previously defined functions
-    unset -f ${DEFINED_FUNCTIONS[*]}
-
-    DEFINED_FUNCTIONS=$(awk -v pname="$PNAME" -v inst="$SVC_INSTANCE" '\
-		    BEGIN{ if (pname=="system") inside=1} {\
-		    if (substr($1,0,1)=="#") next;if ($1=="service") {\
-		      if ((pname==$2 || pname=="") && (inst==$3 || inst=="")) inside=1; else inside=0;}
-		    else if (inside && match($1, "^[a-zA-Z0-9][a-zA-Z0-9_]*$")) \
-			     if (x[$1]!=1) print $1; x[$1]=1;}' $CONFIG)
-
-    # get all first words and build a default function
-    for i in $DEFINED_FUNCTIONS ; do
-	if ! eval "declare -F $i > /dev/null" ; then 
-	    eval "function $i { default_config_option $i \$* ; } "
-	fi 
-    done
 }
 
 # default 'service' function.
@@ -717,7 +674,7 @@ function default_service {
 	return
     fi
 
-    # check for running selected service
+    # check for running selected service. We generally start in previous section.
     if [ "$RUNNING_SECTION" = 1 ]; then
 	# first, we'll check wether the next service is *exactly* the same as
 	# the current one, in which case they are merged, in order to avoid
@@ -739,13 +696,9 @@ function default_service {
 	    fi
 	done
 
-	# unset all options to avoid conflicts with commands (eg: modprobe, ip ...)
-	for i in $DEFINED_FUNCTIONS ${svc_opts[*]}; do
-	    case "$i" in
-		no|service|section|interface) ;;
-		*) unset -f $i ;;
-	    esac
-	done
+	# unset all functions which handle options to avoid conflicts with
+	# commands (eg: modprobe, ip ...)
+	unset ${svc_opts[*]}
 
 	declare -F set_vars > /dev/null && set_vars
 	# force a last eval on each reserved option so that they can refer to
@@ -813,19 +766,11 @@ function default_service {
           fi
         fi
 	unset -v RUNNING_SECTION SVC_ARGS bin cmdline pidfile procname $SVC_VARS
-
-	# reset all options to the default option
-	for i in $DEFINED_FUNCTIONS; do
-	    case "$i" in
-		no|service|section|interface) ;;
-		*) unset -f $i
-		   eval "function $i { default_config_option $i \$* ; } "
-		   ;;
-	    esac
-	done
     fi
 
     # if service is the one wished, start it at the end
+    # Note that for the first and last sections, it will be different, so we still
+    # need this test.
     if test "x$1" = "x$PNAME" -a \
 	    \( "x$2" = "x${SVC_INSTANCE[0]}" -o "x${SVC_INSTANCE[0]}" = "x" \) ; then
 	# we can test difference between SVC_ARGS and SVC_INSTANCE
@@ -841,7 +786,7 @@ function default_service {
 	# map all options to their functions, and set default vars.
 	i=0
 	while [ $i -lt $svc_nbopts ]; do
-	    eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "
+	    eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; }"
 	    if [ "${svc_vars[$i]}" ]; then
 		if [ "x${svc_fcts[$i]}" != "xmultiple_option" ]; then
 		    eval "${svc_vars[$i]}='${svc_defs[$i]}'"
@@ -1052,7 +997,6 @@ function do_testsec {
 	local svc=$1
 	local instance=$2
 
-        for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
 	i=0 
 	while [ $i -lt $svc_nbopts ]; do
          	eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "	
@@ -1292,8 +1236,6 @@ parse_cfg() {
 # source configuration file, called last.
 function load_config {
     # defines functions for all first words in the config file
-    build_default_func $CONFIG
-
     res_kwd_no=1
     res_kwd_service=1
     res_kwd_section=1
@@ -1343,7 +1285,6 @@ die() {
 ##################################
 #   ALWAYS LOADED WHEN SOURCED   #
 ##################################
-# build default undefined functions
 
 svc_opts=( )
 svc_vars=( )
