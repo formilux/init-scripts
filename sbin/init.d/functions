@@ -678,9 +678,14 @@ function build_default_func {
     [ -f $file ] || return 1 
     # undefine all previously defined functions
     for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
-    DEFINED_FUNCTIONS=`awk '/^[ \t]*[a-zA-Z0-9][a-zA-Z0-9_]*/ \
-                           {gsub("#.*", "", $1); if (!x[$1]) \
-                           {print $1;x[$1]=1;}}' $file `
+
+    DEFINED_FUNCTIONS=$(awk -v pname="$PNAME" -v inst="$SVC_INSTANCE" '\
+		    BEGIN{ if (pname=="system") inside=1} {\
+		    if (substr($1,0,1)=="#") next;if ($1=="service") {\
+		      if ((pname==$2 || pname=="") && (inst==$3 || inst=="")) inside=1; else inside=0;}
+		    else if (inside && match($1, "^[a-zA-Z0-9][a-zA-Z0-9_]*$")) \
+			     if (x[$1]!=1) print $1; x[$1]=1;}' $CONFIG)
+
     # get all first words and build a default function
     for i in $DEFINED_FUNCTIONS ; do
 	if ! eval "declare -F $i > /dev/null" ; then 
@@ -1276,6 +1281,15 @@ function default_no {
     esac
 }
 
+# warning: we need to close both stdin and the config fd in the eval
+# otherwise an external command might eat our config during the eval.
+parse_cfg() {
+	local fd=${1##*/}
+	while read REPLY 2>/dev/null; do
+		eval "${REPLY}"
+	done <&$fd
+}
+
 # source configuration file, called last.
 function load_config {
     # defines functions for all first words in the config file
@@ -1296,7 +1310,11 @@ function load_config {
 	# first keywords out of a section space are for the system, so let's enter
 	# automatically in system section.
 	service system
-	. $CONFIG
+	parse_cfg <(awk -v pname="$PNAME" -v inst="$SVC_INSTANCE" '\
+		    BEGIN{ if (pname=="system") inside=1} {\
+		    if (substr($1,0,1)=="#") next;if ($1=="service") {\
+		      if ((pname==$2 || pname=="") && (inst==$3 || inst=="")) inside=1; else inside=0;}
+		    if (inside) print $0;}' $CONFIG)
 	service ""
     fi
 
@@ -1344,6 +1362,7 @@ while [ $# -gt 0 ] ; do
 	shift
 	;;
     --list_sections)	# list all known sections
+	PNAME=""
 	MUST_LIST_SECTIONS=1
 	load_config
 	exit 0
