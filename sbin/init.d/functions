@@ -1273,7 +1273,8 @@ function default_no {
 }
 
 # Parse the config parts passed on stdin. Empty lines as well as those
-# beginning with # are ignored.
+# beginning with # are ignored. Non-existing options are not reported
+# when just listing sections.
 parse_cfg() {
 	local name res
 	while read REPLY 2>/dev/null; do
@@ -1281,7 +1282,7 @@ parse_cfg() {
 		[ -n "${1##\#*}" ] || continue
 		name=svc_num_$1; res=res_kwd_$1
 		if [ -z "${!name}${!res}" ]; then
-			echo "Bad option '$1' in '$REPLY'"
+			[ "$MUST_LIST_SECTIONS" = 1 ] || echo "Bad option '$1' in '$REPLY'"
 			continue
 		fi
 		eval "${REPLY}"
