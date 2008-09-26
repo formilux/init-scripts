@@ -853,22 +853,7 @@ function default_service {
 	done
 
 	include_default="/etc/default/$PNAME${SVC_ARGS[0]:+.${SVC_ARGS[0]}}"
-	if [ -f "$include_default" ] ; then
-		local include_functions=""
-
-		include_functions=`awk '/^[ \t]*[a-zA-Z0-9][a-zA-Z0-9_]*/ \
-		                        {gsub("#.*", "", $1); if (!x[$1]) \
-		                        {print $1;x[$1]=1;}}' $include_default `
-		# get all first words and build a default function
-		for i in $include_functions ; do
-			if ! eval "declare -F $i > /dev/null" ; then
-				eval "function $i { default_config_option $i \$* ; } "
-				DEFINED_FUNCTIONS="$DEFINED_FUNCTIONS $i"
-			fi
-		done
-
-		. $include_default
-	fi
+	[ -f "$include_default" ] && parse_cfg < $include_default
 
 	# now if the script defines a fct_begin_section() function, let's call
 	# it to preset some default values from external config files.
@@ -1287,19 +1272,19 @@ function default_no {
     esac
 }
 
-# parse the config parts passed on stdin
+# Parse the config parts passed on stdin. Empty lines as well as those
+# beginning with # are ignored.
 parse_cfg() {
 	local name res
 	while read REPLY 2>/dev/null; do
-		[ -n "$REPLY" ] || continue
 		set -- $REPLY
-		name=svc_num_$1
-		res=res_kwd_$1
-		if [ -n "${!name}${!res}" ]; then
-		    eval "${REPLY}"
-		else
-		    echo "Bad option '$1' in '$REPLY'"
+		[ -n "${1##\#*}" ] || continue
+		name=svc_num_$1; res=res_kwd_$1
+		if [ -z "${!name}${!res}" ]; then
+			echo "Bad option '$1' in '$REPLY'"
+			continue
 		fi
+		eval "${REPLY}"
 	done
 }
 
