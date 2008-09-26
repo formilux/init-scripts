@@ -19,8 +19,14 @@ if [ "$1" = "-c" ]; then shift; set -- $*; fi
 export CONFIG=${CONFIG:-/etc/config.rc}
 
 # Process name
-PNAME=`basename $0`
-PPATH=`dirname $0`
+if [ -z "${0##*/*}" ]; then
+    PNAME="${0##*/}"
+    PPATH="${0%/*}"
+    PPATH="${PPATH:-/}"
+else
+    PNAME="$0"
+    PPATH=.
+fi
 PFULLNAME=$0
 
 # Path to startup scripts. Default : /sbin/init.d
