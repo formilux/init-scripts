@@ -642,14 +642,15 @@ function option {
     local fct=$2
     local def=$3
     local opt=0
+    local var_name=svc_num_$1
 
     # first, check if this option has already been defined, and return its
     # index, or a new one if it's new.
-    while : ; do
-	if [ $opt -ge $svc_nbopts ]; then svc_nbopts=$[$opt+1]; break; fi
-	if [ "x$name" = "x${svc_opts[$opt]}" ]; then break; fi
-	opt=$[$opt+1]
-    done
+    opt=${!var_name}
+    if [ -z "$opt" ]; then
+	opt=$((svc_nbopts++))
+	eval $var_name=$opt
+    fi
 
     svc_opts[$opt]=$name
     svc_fcts[$opt]=$fct
@@ -1346,6 +1347,7 @@ svc_vars=( )
 svc_defs=( )
 svc_fcts=( )
 svc_nbopts=0
+unset ${!svc_num_*}
 
 while [ $# -gt 0 ] ; do
     case "$1" in
