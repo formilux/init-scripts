@@ -1194,31 +1194,21 @@ default_no() {
 	    if [ "$MUST_LIST_SECTIONS" = 1 ]; then
 		return
 	    fi
-	    local opt=0
-	    while : ; do
-	    	if [ $opt -ge $svc_nbopts ]; then
-		    # non error since we don't know if this is a valid word.
-	    	    return
-	    	fi
-	    	if [ "x$req" = "x${svc_opts[$opt]}" ]; then
-	    	    if [ "x${svc_fcts[$opt]}" != "xmultiple_option" ]; then
-			eval "${svc_vars[$opt]}=''"
-	    	    else
-			# in case of multiple_option, "no <option> <args>" only
-			# means that we don't want to add <args> to <option>,
-			# but not that we want to clear <option>
-	    		# eval "${svc_vars[$opt]}=( )"
-			:
-	    	    fi
-	    	    break
-	    	fi
-	    	opt=$[$opt+1]
-	    done
 
-	    # this doesn't work because $req is launched under a subshell !
-	    #if declare -F $req >/dev/null; then
-	    #    eval "$req --disable $*"
-	    #fi
+	    local opt=0
+	    local var_name=svc_num_$req
+	    opt=${!var_name}
+	    if [ -z "$opt" ]; then
+		echo "Bad option '$req' in 'no $req $*'"
+		return
+	    fi
+
+	    if [ "${svc_fcts[$opt]}" != "multiple_option" ]; then
+		    # in case of multiple_option, "no <option> <args>" only
+		    # means that we don't want to add <args> to <option>,
+		    # but not that we want to clear <option>.
+		    eval "${svc_vars[$opt]}=''"
+	    fi
     esac
 }
 
