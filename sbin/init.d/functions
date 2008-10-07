@@ -127,7 +127,7 @@ while [ $# -gt 0 ] ; do
 	exit 1
 	;;
     *)
-	break 
+	break
 	;;
     esac
 done
@@ -181,7 +181,7 @@ childrenpid() {
     local found
     local pid=" $* "
 
-    set -- $( exec ps ahxo ppid,pid ) ; while [ $# -gt 0 ] ; do 
+    set -- $( exec ps ahxo ppid,pid ) ; while [ $# -gt 0 ] ; do
 	    [ -z "${pid/* $1 */}" ] && found="$found $2" ; shift ; shift ; done
 
     REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
@@ -209,8 +209,8 @@ svc_pidof() {
 
     #set -- "$( exec ps ahxo pid,ppid,comm )" ; set -- $( echo "$1" | awk '{ print $1,$2,$3}' )
     set -- $( ps ahxo pid,ppid,comm | awk '{ print $1,$2,$3}' )
-    while [ $# -gt 0 ] ; do 
-	[ -z "${comm/* $3 */}" -a -n "${omit/* $1 */}" ] && [ -z "$ppid" -o "$2" = "$ppid" ] && found="$found $1" 
+    while [ $# -gt 0 ] ; do
+	[ -z "${comm/* $3 */}" -a -n "${omit/* $1 */}" ] && [ -z "$ppid" -o "$2" = "$ppid" ] && found="$found $1"
 	shift ; shift ; shift
     done
     REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
@@ -234,7 +234,7 @@ run_stdin() {
 ######################
 
 # this eventually remounts the filesystem hosting the directory given in the
-# argument read-write. 
+# argument read-write.
 # It returns :
 #   - 0 if it was RO and has successfully been remounted RW
 #   - 1 if it was already RW
@@ -259,7 +259,7 @@ remount_rw() {
 }
 
 # this eventually remounts the filesystem hosting the directory given in the
-# argument read-only. 
+# argument read-only.
 # It returns :
 #   - 0 if it was RW and has successfully been remounted RO
 #   - 1 if it was already RO
@@ -445,7 +445,7 @@ do_stop_with_pidfile() {
     local ret
 
     svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
-    
+
     if [ $FORCE_START_STOP -eq 0 ]; then
 	if ! [ -r "$pidfile" ] || { read pid REPLY <"$pidfile"; [ -z "$pid" ]; } || ! [ -L /proc/$pid/cwd ]; then
 	    echo "# Process $pname${instname:+[$instname]} already stopped (according to $pidfile)${pids:+, but check pids : $pids}"
@@ -460,7 +460,7 @@ do_stop_with_pidfile() {
 	echo "# The pid in $pidfile points to a wrong process name ($pid:$1)${pids:+. Check $pids for $pname${instname:+[$instname]}}."
 	return 1;
     fi
- 
+
     echo "# Stopping $pname${instname:+[$instname]} (pid $pid according to $pidfile) ..."
 
     ret=0
@@ -509,9 +509,9 @@ do_stop() {
     local retry
     local ret
     shift
- 
+
     pname=${procname:-$pname}
-    # stop service from pidfile 
+    # stop service from pidfile
     [ "x$pidfile" != x ] && { do_stop_with_pidfile $pidfile $pname $instname; return $? ; }
 
     # stop service from pidof data
@@ -559,7 +559,7 @@ do_stop() {
 
 # reload only for started processes
 do_reload_started() {
-    
+
     if [ "x$pidfile" != x ] ; then
       kill -HUP $(<$pidfile)
     else
@@ -652,9 +652,9 @@ do_status() {
     shift
 
     pname=${procname:-$pname}
-    # get info from pidfile if it exist 
+    # get info from pidfile if it exist
     [ "x$pidfile" != x ] && { do_status_with_pidfile $pidfile $pname $instname; return $? ; }
-    
+
     # get info from pidof command
     svc_pidof -o $$ $pname > /dev/null ; pids=$REPLY
     [ "$pids" ] && { echo "Process $pname${instname:+[$instname]} running without pidfile : $pids" ; return 0 ; }
@@ -741,7 +741,7 @@ default_service() {
     local opt
     local val
     # skip first parameter (probably 'service')
-    #shift  
+    #shift
 
     # check for running selected service. We generally start in previous section.
     if [ "$RUNNING_SECTION" = 1 ]; then
@@ -795,7 +795,7 @@ default_service() {
 					ret=$?
 				fi
 				;;
-			*) 
+			*)
 				# std case
 				do_$ACTION $PNAME ${SVC_ARGS[*]} <&3 3>/dev/null
 				ret=$?
@@ -824,14 +824,14 @@ default_service() {
 
         if [ "x$G_FACILITY" != x ] ; then
           if [ "x$ACTION" = xstart -o "x$ACTION" = xstop \
-               -o "x$ACTION" = xrestart ] ; then 
+               -o "x$ACTION" = xrestart ] ; then
             if [ $ret -gt 0 ] ; then
               logger -p $G_FACILITY.err -t flxi[$$].$PNAME -- \
                   "error[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]} = $ret"
             else
               logger -p $G_FACILITY.info -t flxi[$$].$PNAME -- \
                   "done[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
-            fi 
+            fi
           fi
         fi
 	unset -v RUNNING_SECTION SVC_ARGS bin cmdline pidfile procname $SVC_VARS
@@ -876,25 +876,25 @@ default_service() {
     fi
 }
 
-# Prepare section(s) for edit 
+# Prepare section(s) for edit
 do_getsec() {
 	local svc=$1;
         local instance=$2;
 	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
 
 	[ -e "$tmpconfig" ] && cat "$tmpconfig" && return 0
-	
+
 	(
 	local print=0
-	
+
 	while : ; do
 		read
 		eof=$?
 		[ "$eof" != "0" ] && [ -z "$REPLY" ] && break
 
-		set -- $REPLY	
+		set -- $REPLY
 		[ "$1" = "no" ] && shift ;
-		
+
                 if [ "$1" = "service" ] ; then
 			print=0
 			if [ -n "$instance" ] ; then
@@ -907,20 +907,20 @@ do_getsec() {
 
 		[ "$eof" != "0" ] && echo ""
 
-        done 
-	exit 0 ) < $CONFIG 
+        done
+	exit 0 ) < $CONFIG
 
-        return 0 
+        return 0
 }
 
-# Insert edited section(s) 
+# Insert edited section(s)
 do_setsec() {
 	local svc=$1
         local instance=$2
 	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
-	
+
 	do_checksec $svc $instance
-	[ "$?" != "0" ] && return 1 
+	[ "$?" != "0" ] && return 1
 	[ ! -e "$tmpconfig" ] && echo "No configuration to commit" >&2  && return 0
 
         (
@@ -928,10 +928,10 @@ do_setsec() {
 	local found=0
 
         while : ; do
-               
+
 		read
 		eof=$?
-		[ "$eof" != "0" ] && [ -z "$REPLY" ] && break 
+		[ "$eof" != "0" ] && [ -z "$REPLY" ] && break
 		set -- $REPLY
                 [ "$1" = "no" ] && shift ;
 
@@ -943,7 +943,7 @@ do_setsec() {
 					found=1
 					print=0
 				fi
-                        elif [ $found -eq 0 ] ; then 
+                        elif [ $found -eq 0 ] ; then
                                 if [ "$2" = "$svc" ] ; then
 					cat "$tmpconfig"
 					found=1
@@ -959,7 +959,7 @@ do_setsec() {
 		# config rc need returns on last line
 		[ "$eof" != "0" ] && echo ""
 
-        done 
+        done
 	exit 0
 	) < $CONFIG >$CONFIG.new
 
@@ -981,7 +981,7 @@ do_checksec() {
 	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
 	local length=0
 	local hread=0
-	if [ ! -t 0 ] ; then 
+	if [ ! -t 0 ] ; then
 	        eval $(
                         IFS=""
                         header="Content-length: "
@@ -994,18 +994,18 @@ do_checksec() {
                         exit 0
       		)
 		if [ "$hread" = "1" ] ; then
-			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1 	
+			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1
        			cat > "$tmpconfig"
 			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
 		fi
-	fi 
+	fi
 
-	[ ! -e "$tmpconfig" ] && echo "Configuration not modified" >&2 && return 0 
+	[ ! -e "$tmpconfig" ] && echo "Configuration not modified" >&2 && return 0
 	( $INIT_PATH/$svc -f $tmpconfig testsec $instance >&2 )
 	[ "$?" != "0" ] && return 1
-	
-	return 0 
+
+	return 0
 }
 
 
@@ -1026,9 +1026,9 @@ do_testsec() {
 	local instance=$2
 
         for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
-	i=0 
+	i=0
 	while [ $i -lt $svc_nbopts ]; do
-         	eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "	
+         	eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "
   		i=$[$i+1]
 	done
 
@@ -1037,7 +1037,7 @@ do_testsec() {
 	(
 	  local func
     	  local found=0
- 
+
           while : ; do
 
 		read
@@ -1045,7 +1045,7 @@ do_testsec() {
 		set -- $REPLY
 
        		if [ -n "$1" -a "${1:0:1}" != "#" ] ; then
-	
+
 			[ "$1" = "no" ] && shift ;
 			func="$1" ; shift;
 
@@ -1062,8 +1062,8 @@ do_testsec() {
 					echo "Error: invalid line $REPLY"
 					return 1
 				fi
-			
-				# execute function	
+
+				# execute function
 				$func $@
 				if [ $? -ne 0 ] ; then
 					echo "Error: invalid line  $REPLY"
@@ -1089,19 +1089,19 @@ do_testsec() {
                         	        fi
 				fi
 			fi
-				
+
 		fi
 	 done
         ) <$CONFIG
-  
-    [ "$?" != "0" ] && exit 1 
 
-    exit 0 
+    [ "$?" != "0" ] && exit 1
+
+    exit 0
 
 }
 
 
-# Dump configuration for edit 
+# Dump configuration for edit
 do_getconf() {
 	local p=$1
 	local instance=$2
@@ -1111,7 +1111,7 @@ do_getconf() {
 
 	[ -z "$opt_config" -o ! -e "$opt_config" ] && echo "No configuration available!" >&2 &&  return 1
 
-	cat "$opt_config" 
+	cat "$opt_config"
 
 	return 0
 }
@@ -1125,7 +1125,7 @@ do_checkconf() {
 	local hread=0
 	local ret
 
-	if [ ! -t 0 ] ; then 
+	if [ ! -t 0 ] ; then
 	        eval $(
                         IFS=""
                         header="Content-length: "
@@ -1138,19 +1138,19 @@ do_checkconf() {
                         exit 0
 	        )
 
-		if [ "$hread" = "1" ] ; then	
-			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1 	
+		if [ "$hread" = "1" ] ; then
+			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1
        			cat > "$tmpconfig"
 			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
 		fi
 	fi
 
-	[ ! -e "$tmpconfig" ] && echo "Configuration not modified" >&2 && return 0 
+	[ ! -e "$tmpconfig" ] && echo "Configuration not modified" >&2 && return 0
 	ret=0
         declare -F fct_post_checkconf >/dev/null && { fct_post_checkconf "$p" "$instance" "$tmpconfig" ; ret=$?; }
 
-	return $ret 
+	return $ret
 }
 
 # Cancel configuration edit
@@ -1212,12 +1212,12 @@ do_autostart() {
 					written=1
 					echo "    no autostart"
 				fi
-				echo "" 
+				echo ""
 			elif [  "$1" != "autostart" ] ; then
-				echo "$REPLY" 
+				echo "$REPLY"
 			fi
 		else
-			echo "$REPLY" 
+			echo "$REPLY"
 		fi
 
 	done
@@ -1297,7 +1297,7 @@ load_config() {
 	default_service network $*;
     }
 
-    if test ! -d "$CONFIG" -a -e "$CONFIG" ; then 
+    if test ! -d "$CONFIG" -a -e "$CONFIG" ; then
 	# first keywords out of a section space are for the system, so let's enter
 	# automatically in system section.
 	service system
