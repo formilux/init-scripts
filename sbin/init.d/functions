@@ -814,10 +814,13 @@ default_service() {
 }
 
 # Prepare section(s) for edit 
-fct_pre_getsec() {
+do_getsec() {
 	local svc=$1;
         local instance=$2;
+	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
 
+	[ -e "$tmpconfig" ] && cat "$tmpconfig" && return 0
+	
 	(
 	local print=0
 	
@@ -842,22 +845,19 @@ fct_pre_getsec() {
 		[ "$eof" != "0" ] && echo ""
 
         done 
-	exit 0 ) < $CONFIG > $EDIT_TMPSEC
+	exit 0 ) < $CONFIG 
 
-	if [ "$?" != "0" ] ; then
-		rm -f "$EDIT_TMPSEC" >/dev/null 2>&1
-		return 1
-	fi
-
-        return 0
+        return 0 
 }
 
-
-
 # Insert edited section(s) 
-fct_post_setsec() {
-	local svc=$1;
-        local instance=$2;
+do_setsec() {
+	local svc=$1
+        local instance=$2
+	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
+	
+	do_checksec $svc $instance
+	[ "$?" != "0" ] && return 1 
 
         (
         local print=1
@@ -875,16 +875,16 @@ fct_post_setsec() {
                         print=1
                         if [ -n "$instance" -a $found -eq 0 ] ; then
                                 if [ "$2" = "$svc" -a "$3" = "$instance" ] ; then
-					cat "$EDIT_TMPSEC"
+					cat "$tmpconfig" | grep -vE '^($|( |	)*$'
+					echo ""
 					found=1
-					[ -n "$(tail -c 1 "$EDIT_TMPSEC")" ] && echo ""
 					print=0
 				fi
                         elif [ $found -eq 0 ] ; then 
                                 if [ "$2" = "$svc" ] ; then
-					cat "$EDIT_TMPSEC"
+					cat "$tmpconfig" | grep -vE '^( |	)*$'
+					echo ""
 					found=1
-					[ -n "$(tail -c 1 "$EDIT_TMPSEC")" ] && echo ""
 					print=0
 				fi
                         elif [ -z "$instance" ] ; then
@@ -898,53 +898,30 @@ fct_post_setsec() {
 		[ "$eof" != "0" ] && echo ""
 
         done 
-	exit 0 ) < $CONFIG >$CONFIG.new	       
+	exit 0
+	) < $CONFIG >$CONFIG.new
 
 	if [ "$?" != "0" ] ; then
 		rm -f $CONFIG.new >/dev/null 2>&1
+		return 1
 	fi
 
 	mv "$CONFIG.new" "$CONFIG"
+	rm -f "$tmpconfig"
 
         return 0
 }
 
-# Dump section(s) for edit
-do_getsec() {
-	local p=$1
-	local instance=$2
-
-	
-	if [ ! -e "$EDIT_TMPSEC" ] ; then
- 		fct_pre_getsec "$p" "$instance"
-		[ "$?" != 0 ] && return 1
-	fi
-	
-	[ ! -e "$EDIT_TMPSEC" ] && return 1
-	cat "$EDIT_TMPSEC"
-
-	return 0;
-}
-
-# Test edited section
-fct_post_checksec() {
-	local p=$1
-	local instance=$2
-
-	( $INIT_PATH/$p -f $EDIT_TMPSEC testsec $instance >&2 )
-	[ "$?" != "0" ] && return 1
-
-	return 0
-}
-
 # Update and test edited section
 do_checksec() {
-	local p=$1
+	local svc=$1
 	local instance=$2
+	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
 	local length=0
 	local test;
-	if [ ! -t 0 ] ; then
-              eval $(
+
+	if [ ! -t 0 ] ; then 
+	        eval $(
                         IFS=""
                         header="Content-length: "
                         while read line; do
@@ -955,44 +932,31 @@ do_checksec() {
                                 fi
                         done
                         exit 0
-               )
+      		)
 		
-               if [ $length -gt 0 ] ; then
-                        cat > "$EDIT_TMPSEC"
-               fi
+		if [ "$length" != "0" ] ; then
+	       		cat > "$tmpconfig"
+			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 
-	fi
+			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
+		fi
+	fi 
 
-	[ ! -e "$EDIT_TMPSEC" ] && return 1
-
-	fct_post_checksec $p $instance
+	[ ! -e "$tmpconfig" ] && echo "Configuration not modified" >&2 && return 0 
+	( $INIT_PATH/$svc -f $tmpconfig testsec $instance >&2 )
 	[ "$?" != "0" ] && return 1
 	
 	return 0 
 }
 
-# Update test and insert edited section(s) 
-do_setsec() {
-	local p=$1
-        local instance=$2
-        local length=0
-        local test;
-
-	do_checksec $1 $2
-	[ "$?" != "0" ] && return 1 
-		
-	fct_post_setsec $p $instance 
-	[ "$?" != "0" ] && return 1 
-
-	rm -f "$EDIT_TMPSEC" 2>/dev/null 2>&1
-
-	return 0
-}
 
 # Cancel section(s) edit
 do_cancelsec() {
-	
-	rm -f "$EDIT_TMPSEC" 2>/dev/null 2>&1
+	local svc=$1
+	local instance=$2
+	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
+
+	rm -f "$tmpconfig" 2>/dev/null 2>&1
 
 	return 0
 }
@@ -1003,13 +967,14 @@ do_testsec() {
 	local svc=$1
 	local instance=$2
 
+        for func in $DEFINED_FUNCTIONS ; do unset -f $func ; done
 	i=0 
 	while [ $i -lt $svc_nbopts ]; do
-         	eval "${svc_opts[$i]}() { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; }"	
+         	eval "function ${svc_opts[$i]} { ${svc_fcts[$i]} ${svc_opts[$i]} \$* ; } "	
   		i=$[$i+1]
 	done
 
-	eval "service() { [ "x\$1" != "x$svc" ] && return 1 ; [ "x$instance" != "x" -a "x$instance" != "x\$2" ] && return 1 ; return 0 ; } "
+	eval "function service { [ "x\$1" != "x$svc" ] && return 1 ; [ "x$instance" != "x" -a "x$instance" != "x\$2" ] && return 1 ; return 0 ; } "
 
 	(
 	  local func
@@ -1077,29 +1042,18 @@ do_testsec() {
 
 }
 
-# Prepare configuration for edit
-fct_pre_getconf() {
-
-	[ -z "$opt_config" -o ! -e "$opt_config" ] && return 1
-
-	cat "$opt_config" > "$EDIT_TMPCNF"
-	
-	return 0
-}
 
 # Dump configuration for edit 
 do_getconf() {
 	local p=$1
 	local instance=$2
+	local tmpconfig="/tmp/$p${instance:+instance}.conf"
 
-	if [ ! -e "$EDIT_TMPCNF" ] ; then	
-      		fct_pre_getconf "$p" "$instance"
-		[ $? -gt 0 ] && return 1
+	[ -e "$tmpconfig" ] && cat "$tmpconfig" && return 0
 
-	fi
-	
-	[ ! -e "$EDIT_TMPCNF" ] && return 1
-	cat "$EDIT_TMPCNF"
+	[ -z "$opt_config" -o ! -e "$opt_config" ] && echo "No configuration available!" >&2 &&  return 1
+
+	cat "$opt_config" 
 
 	return 0
 }
@@ -1108,10 +1062,12 @@ do_getconf() {
 do_checkconf() {
 	local p=$1
 	local instance=$2
+	local tmpconfig="/tmp/$p${instance:+.$instance}.conf"
 	local length=0
 
-	if [ ! -t 0 ] ; then
-              eval $(
+
+	if [ ! -t 0 ] ; then 
+	        eval $(
                         IFS=""
                         header="Content-length: "
                         while read line; do
@@ -1122,55 +1078,44 @@ do_checkconf() {
                                 fi
                         done
                         exit 0
-               )
-
-               if [ $length -gt 0 ] ; then
-                        cat > "$EDIT_TMPCNF"
-               fi
-
-        fi
+	        )
 	
-	[ ! -e "$EDIT_TMPCNF" ] && return 1
+	        if [ "$length" != "0" ] ; then 
+	      		cat > "$tmpconfig"
+			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 
+			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
+		fi
+	fi
 
+	[ ! -e "$tmpconfig" ] && echo "Configuration not modified" >&2 && return 0 
 	ret=0
-        declare -F fct_post_checkconf >/dev/null && { fct_post_checkconf $p $instance ; ret=$?; }
+        declare -F fct_post_checkconf >/dev/null && { fct_post_checkconf "$p" "$instance" "$tmpconfig" ; ret=$?; }
 
 	return $ret 
 }
 
 # Cancel configuration edit
 do_cancelconf() {
-
-	rm -f "$EDIT_TMPCNF" 2>/dev/null 2>&1
-
-	return 0
-}
-
-# Commit edited configuration
-fct_post_setconf() {
-
-	[ -z "$opt_config" ] && return 1
-
-	mv "$EDIT_TMPCNF" "$opt_config"
+	local p=$1
+	local instance=$2
+	local tmpconfig="/tmp/$p${instance:+.$instance}.conf"
+	rm -f "$tmpconfig" 2>/dev/null 2>&1
 
 	return 0
 }
+
 
 # Update test and commit edited configuration
 do_setconf() {
-	
 	local p=$1
         local instance=$2
-        local length=0
+	local tmpconfig="/tmp/$p${instance:+.$instance}.conf"
 
 	do_checkconf $p $instance
 	[ "$?" != "0" ] && return 1
 
-        fct_post_setconf $p $instance
-	[ "$?" != "0" ] && return 1
-
-	rm -f "$EDIT_TMPCNF" >/dev/null 2>&1
+	[ -n "$opt_config" ] && mv "$tmpconfig" "$opt_config"
 
 	return 0
 }
@@ -1199,16 +1144,16 @@ default_no() {
 	    local var_name=svc_num_$req
 	    opt=${!var_name}
 	    if [ -z "$opt" ]; then
-		echo "Bad option '$req' in 'no $req $*'"
+	        echo "Bad option '$req' in 'no $req $*'"
 		return
 	    fi
 
-	    if [ "${svc_fcts[$opt]}" != "multiple_option" ]; then
-		    # in case of multiple_option, "no <option> <args>" only
-		    # means that we don't want to add <args> to <option>,
-		    # but not that we want to clear <option>.
-		    eval "${svc_vars[$opt]}=''"
-	    fi
+	   if [ "${svc_fcts[$opt]}" != "multiple_option" ]; then
+	           # in case of multiple_option, "no <option> <args>" only
+	           # means that we don't want to add <args> to <option>,
+	           # but not that we want to clear <option>.
+	           eval "${svc_vars[$opt]}=''"
+	   fi
     esac
 }
 
@@ -1339,11 +1284,6 @@ ACTION=${1:-start}; shift
 
 # Assign the requested instances to SVC_INSTANCE. Default : ""
 SVC_INSTANCE=( $* )
-
-# Edition buffer path
-EDIT_TMPDIR="/tmp"
-EDIT_TMPSEC=$EDIT_TMPDIR/$PNAME${SVC_INSTANCE[0]}.sec
-EDIT_TMPCNF=$EDIT_TMPDIR/$PNAME${SVC_INSTANCE[0]}.conf
 
 # most services don't need to redefine the keywords "bin", "cmdline",
 # "pidfile", "procname" and "check_interval", so let's initialize them now.
