@@ -1232,7 +1232,8 @@ load_config() {
 	service system
 	run_stdin parse_cfg <(awk -v pname="$PNAME" -v inst="$SVC_INSTANCE" '\
 		    BEGIN{ if (pname=="system") inside=1} {\
-		    if (substr($1,0,1)=="#") next;if ($1=="service") {\
+		    if (substr($1,0,1)=="#") next; if ($1=="no" && $2=="service") inside=0;\
+		    else if ($1=="service") {\
 		      if ((pname==$2 || pname=="") && (inst==$3 || inst=="")) inside=1; else inside=0;}
 		    if (inside) print $0;}' $CONFIG)
 	service ""
