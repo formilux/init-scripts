@@ -719,7 +719,7 @@ default_service() {
 	if [ "$SVC_AUTO_START" = 0 -o "$autostart" = 1 ]; then
 	    if declare -f do_$ACTION >/dev/null; then
 		case $ACTION in
-			getsec|getconf|setsec|setconf|checkconf|checksec|testsec)
+			getsec|getconf|setsec|setconf|checkconf|checksec|testsec|autostart)
 				if [ "x${SVC_INSTANCE[0]}" = "x" ] ; then
 				# if no instances in args, execute do_$ACTION
 				# only one time for those actions
@@ -741,7 +741,7 @@ default_service() {
 
 	    else
 		case $ACTION in
-			getsec|getconf|setsec|setconf|checkconf|checksec|testsec) ;;
+			getsec|getconf|setsec|setconf|checkconf|checksec|testsec|autostart) ;;
 			*)
 				if declare -f do_help >/dev/null; then
 				    	do_help
@@ -1118,6 +1118,56 @@ do_setconf() {
 	[ -n "$opt_config" ] && mv "$tmpconfig" "$opt_config"
 
 	return 0
+}
+
+do_autostart() {
+	local svc=$1
+	local instance=$2
+
+	(
+	local cur=0
+	local written=0
+
+	while : ; do
+		read
+		[ "$?" != "0" ] && [ -z "$REPLY" ] && break
+
+		set -- $REPLY
+		[ "$1" = "no" ] && shift ;
+
+		if [ "$1" = "service" ] ; then
+		[ $cur -eq 1 ] && [ "$written" = "0" ] && [ "$autostart" = "1" ] && echo "    no autostart" && echo ""
+			echo "$REPLY"
+			cur=0
+			written=0
+			if [ -n "$instance" ] 
+				if [ "$2" = "$svc" -a "$3" = "$instance" ] ; then
+					cur=1
+				fi
+			elif [ "$2" = "$svc" ] ; then
+				cur=1 ;
+			fi
+
+		elif [ $cur -eq 1 ] ; then
+			if [ -z "$1" ] ; then
+				if [ "$written" = "0" -a "$autostart" = "1" ] ; then
+					written=1
+					echo "    no autostart"
+				fi
+				echo "" 
+			elif [  "$1" != "autostart" ] ; then
+				echo "$REPLY" 
+			fi
+		else
+			echo "$REPLY" 
+		fi
+
+	done
+	exit 0 ) < $CONFIG >$CONFIG.new
+
+	[ "$?" != "0" ] && return 1
+
+	mv $CONFIG.new $CONFIG
 }
 
 
