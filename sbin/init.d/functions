@@ -42,9 +42,6 @@ RUNNING_SECTION=
 # goes "1" if at least one instance of the required service has been found
 SVC_FOUND=
 
-# not in list mode
-MUST_LIST_SECTIONS=
-
 # no option filter
 OPTION_FILTER=
 
@@ -675,13 +672,6 @@ default_service() {
     # skip first parameter (probably 'service')
     #shift  
 
-    # we're in listing mode, we do nothing except listing the services
-    if [ "$MUST_LIST_SECTIONS" = 1 -a $# -ge 1 ]; then
-	[ "$1" != "${SVC_ARGS[0]}" -o "$2" != "${SVC_ARGS[1]}" ] && echo $*
-	SVC_ARGS=( $* )
-	return
-    fi
-
     # check for running selected service. We generally start in previous section.
     if [ "$RUNNING_SECTION" = 1 ]; then
 	# first, we'll check wether the next service is *exactly* the same as
@@ -1183,10 +1173,6 @@ default_no() {
 	    default_service
 	    ;;
 	*)
-	    if [ "$MUST_LIST_SECTIONS" = 1 ]; then
-		return
-	    fi
-
 	    local opt=0
 	    local var_name=svc_num_$req
 	    opt=${!var_name}
@@ -1214,7 +1200,7 @@ parse_cfg() {
 		[ -n "${1##\#*}" ] || continue
 		name=svc_num_$1; res=res_kwd_$1
 		if [ -z "${!name}${!res}" ]; then
-			[ "$MUST_LIST_SECTIONS" = 1 ] || echo "Bad option '$1' in '$REPLY'"
+			echo "Bad option '$1' in '$REPLY'"
 			continue
 		fi
 		eval "${REPLY}"
@@ -1252,7 +1238,7 @@ load_config() {
 	service ""
     fi
 
-    if [ "$SVC_FOUND" != 1 -a "$MUST_LIST_SECTIONS" != 1 ]; then
+    if [ "$SVC_FOUND" != 1 ]; then
 	echo "Warning: service/instance not found in $CONFIG, using default values."
 	service $PNAME ; service ""
 
@@ -1296,9 +1282,8 @@ while [ $# -gt 0 ] ; do
 	shift
 	;;
     --list_sections)	# list all known sections
-	PNAME=""
-	MUST_LIST_SECTIONS=1
-	load_config
+	# just list sections ("<svcname> [<section>]") then exit
+	awk '/^[[:blank:]]*service/ { print $2 ($3?" "$3:"") }' < $CONFIG
 	exit 0
 	;;
     --filter_option)	# display only this option in list_options
