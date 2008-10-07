@@ -66,9 +66,80 @@ LOGFILE=/var/log/startup.log
 # the scripts can list some global variables which they use and that should be
 # unset after processing the service. This is to be set globally.
 SVC_VARS=
+svc_opts=( )
+svc_vars=( )
+svc_defs=( )
+svc_fcts=( )
+svc_nbopts=0
+unset ${!svc_num_*} ${!res_kwd_*}
 
 # this is set to $? for the first do_xxx which doesn't return 0
 STATUS_RET=0
+
+# abort the process after displaying an error message.
+die() {
+    echo $* >&2
+    exit 1
+}
+
+##########################################################################
+# Main entry point. It is always executed even when the file is sourced. #
+##########################################################################
+
+# It is important that this entry point sits at the top of the file because
+# it provides better overall performance for quick calls.
+
+while [ $# -gt 0 ] ; do
+    case "$1" in
+    -f|--file)	# use this configuration file
+	export CONFIG="$2"
+	shift 2 || die "Error: missing arg for --file, try --help."
+	;;
+    --auto)	# only start services which don't have a "no autostart" statement
+	SVC_AUTO_START=1
+	shift
+	;;
+    --force)	# force start or stop disregarding current status
+	FORCE_START_STOP=1
+	shift
+	;;
+    --list_sections)  # just list sections ("<svcname> [<section>]") then exit
+	awk '/^[[:blank:]]*service/ { print $2 ($3?" "$3:"") }' < $CONFIG
+	exit 0
+	;;
+    --filter_option)	# display only this option in list_options
+	OPTION_FILTER="$2"
+	shift 2 || die "Error: missing arg for --filter_option, try --help."
+	;;
+    -o|--option)	# force options : -o "opt=val,opt=val..."
+	FORCE_OPTIONS="$2"
+	shift 2 || die "Error: missing arg for --option, try --help."
+	;;
+    -*)
+	echo "Common commands : start, stop, restart, status, check, list_options."
+	echo "Global options :"
+	grep $'^[ \t]*-[-a-z0-9_|]*)[ \t]*# ' $PPATH/functions | \
+	    sed -e $'s/^\\([ \t]*\\)\\([^)]*\\)\\([ \t#)]*\\)\\(.*\\)/    \\2\t\t\\4/'
+	echo "Other options :"
+	declare -F usage > /dev/null && usage $* || \
+	    echo "    -h|--help		display this help" && \
+		[ "x$USAGE" != x ] && echo "$USAGE"
+	exit 1
+	;;
+    *)
+	break 
+	;;
+    esac
+done
+
+# Assign the requested action to ACTION (first arg). Default : start
+ACTION=${1:-start}; shift
+
+# Assign the requested instances to SVC_INSTANCE. Default : ""
+SVC_INSTANCE=( $* )
+
+# After that, code jumps to the end of the file to declare a few
+# default options.
 
 ########################################
 #           BASIC FUNCTIONS            #
@@ -1251,72 +1322,9 @@ load_config() {
     return $STATUS_RET
 }
 
-# abort the process after displaying an error message.
-die() {
-    echo $* >&2
-    exit 1
-}
-
-##################################
-#   ALWAYS LOADED WHEN SOURCED   #
-##################################
-
-svc_opts=( )
-svc_vars=( )
-svc_defs=( )
-svc_fcts=( )
-svc_nbopts=0
-unset ${!svc_num_*} ${!res_kwd_*}
-
-while [ $# -gt 0 ] ; do
-    case "$1" in
-    -f|--file)	# use this configuration file
-	export CONFIG=$2
-	shift 2 || die "Error: missing arg for --file, try --help."
-	;;
-    --auto)	# only start services which don't have a "no autostart" statement
-	SVC_AUTO_START=1
-	shift
-	;;
-    --force)	# force start or stop disregarding current status
-	FORCE_START_STOP=1
-	shift
-	;;
-    --list_sections)	# list all known sections
-	# just list sections ("<svcname> [<section>]") then exit
-	awk '/^[[:blank:]]*service/ { print $2 ($3?" "$3:"") }' < $CONFIG
-	exit 0
-	;;
-    --filter_option)	# display only this option in list_options
-	OPTION_FILTER=$2
-	shift 2 || die "Error: missing arg for --filter_option, try --help."
-	;;
-    -o|--option)	# force options : -o "opt=val,opt=val..."
-	FORCE_OPTIONS=$2
-	shift 2 || die "Error: missing arg for --option, try --help."
-	;;
-    -*)
-	echo "Common commands : start, stop, restart, status, check, list_options."
-	echo "Global options :"
-	grep $'^[ \t]*-[-a-z0-9_|]*)[ \t]*# ' $PPATH/functions | \
-	    sed -e $'s/^\\([ \t]*\\)\\([^)]*\\)\\([ \t#)]*\\)\\(.*\\)/    \\2\t\t\\4/'
-	echo "Other options :"
-	declare -F usage > /dev/null && usage $* || \
-	    echo "    -h|--help		display this help" && \
-		[ "x$USAGE" != x ] && echo "$USAGE"
-	exit 1
-	;;
-    *)
-	break 
-	;;
-    esac
-done
-
-# Assign the requested action to ACTION (first arg). Default : start
-ACTION=${1:-start}; shift
-
-# Assign the requested instances to SVC_INSTANCE. Default : ""
-SVC_INSTANCE=( $* )
+###################################################################
+# Second half of main entry point. Declaration of default options #
+###################################################################
 
 # most services don't need to redefine the keywords "bin", "cmdline",
 # "pidfile", "procname" and "check_interval", so let's initialize them now.
