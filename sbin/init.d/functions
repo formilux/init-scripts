@@ -8,6 +8,8 @@
 #
 # This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
 
+exec 3<&0
+
 # Test for previous sourcing already in progress
 declare -F reserved_bool_option > /dev/null && return
 
@@ -719,29 +721,29 @@ default_service() {
 	if [ "$SVC_AUTO_START" = 0 -o "$autostart" = 1 ]; then
 	    if declare -f do_$ACTION >/dev/null; then
 		case $ACTION in
-			getsec|getconf|setsec|setconf|checkconf|checksec|testsec|autostart)
+			getsec|getconf|setsec|setconf|checksec|checkconf|cancelsec|cancelconf|testsec|autostart)
 				if [ "x${SVC_INSTANCE[0]}" = "x" ] ; then
 				# if no instances in args, execute do_$ACTION
 				# only one time for those actions
-					do_$ACTION $PNAME 
+					do_$ACTION $PNAME <&3 3>/dev/null
 					ret=$?
 					unset -f do_$ACTION
 				else
 				# else process as std case
-					do_$ACTION $PNAME ${SVC_ARGS[*]}
+					do_$ACTION $PNAME ${SVC_ARGS[*]} <&3 3>/dev/null
 					ret=$?
 				fi
 				;;
 			*) 
 				# std case
-				do_$ACTION $PNAME ${SVC_ARGS[*]}
+				do_$ACTION $PNAME ${SVC_ARGS[*]} <&3 3>/dev/null
 				ret=$?
 				;;
 		esac
 
 	    else
 		case $ACTION in
-			getsec|getconf|setsec|setconf|checkconf|checksec|testsec|autostart) ;;
+			getsec|getconf|setsec|setconf|checksec|checkconf|cancelsec|cancelconf|testsec|autostart) ;;
 			*)
 				if declare -f do_help >/dev/null; then
 				    	do_help
@@ -858,6 +860,7 @@ do_setsec() {
 	
 	do_checksec $svc $instance
 	[ "$?" != "0" ] && return 1 
+	[ ! -e "$tmpconfig" ] && echo "No configuration to commit" >&2  && return 0
 
         (
         local print=1
@@ -875,15 +878,13 @@ do_setsec() {
                         print=1
                         if [ -n "$instance" -a $found -eq 0 ] ; then
                                 if [ "$2" = "$svc" -a "$3" = "$instance" ] ; then
-					cat "$tmpconfig" | grep -vE '^($|( |	)*$'
-					echo ""
+					cat "$tmpconfig"
 					found=1
 					print=0
 				fi
                         elif [ $found -eq 0 ] ; then 
                                 if [ "$2" = "$svc" ] ; then
-					cat "$tmpconfig" | grep -vE '^( |	)*$'
-					echo ""
+					cat "$tmpconfig"
 					found=1
 					print=0
 				fi
@@ -918,26 +919,23 @@ do_checksec() {
 	local instance=$2
 	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
 	local length=0
-	local test;
-
+	local hread=0
 	if [ ! -t 0 ] ; then 
 	        eval $(
                         IFS=""
                         header="Content-length: "
                         while read line; do
-                                if [ -z "$line" ] ; then
-                                        exit 0
-                                elif [ "${line:0:${#header}}" = "$header" ] ; then
-                                        echo -ne "length=${line:${#header}}; "
+                                [ -z "$line" ] && echo "hread=1" && exit 0
+                                if [ "${line:0:${#header}}" = "$header" ] ; then
+                                        echo -ne "length=${line:${#header}} ; "
                                 fi
                         done
                         exit 0
       		)
-		
-		if [ "$length" != "0" ] ; then
-	       		cat > "$tmpconfig"
+		if [ "$hread" = "1" ] ; then
+			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1 	
+       			cat > "$tmpconfig"
 			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
-
 			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
 		fi
 	fi 
@@ -955,8 +953,7 @@ do_cancelsec() {
 	local svc=$1
 	local instance=$2
 	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
-
-	rm -f "$tmpconfig" 2>/dev/null 2>&1
+	rm -f "$tmpconfig" >/dev/null 2>&1
 
 	return 0
 }
@@ -1064,26 +1061,26 @@ do_checkconf() {
 	local instance=$2
 	local tmpconfig="/tmp/$p${instance:+.$instance}.conf"
 	local length=0
-
+	local hread=0
+	local ret
 
 	if [ ! -t 0 ] ; then 
 	        eval $(
                         IFS=""
                         header="Content-length: "
                         while read line; do
-                                if [ -z "$line" ] ; then
-                                        exit 0
-                                elif [ "${line:0:${#header}}" = "$header" ] ; then
+                                [ -z "$line" ] && echo "hread=1" && exit 0
+                                if [ "${line:0:${#header}}" = "$header" ] ; then
                                         echo -ne "length=${line:${#header}}; "
                                 fi
                         done
                         exit 0
 	        )
-	
-	        if [ "$length" != "0" ] ; then 
-	      		cat > "$tmpconfig"
-			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 
+		if [ "$hread" = "1" ] ; then	
+			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1 	
+       			cat > "$tmpconfig"
+			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
 		fi
 	fi
@@ -1100,7 +1097,7 @@ do_cancelconf() {
 	local p=$1
 	local instance=$2
 	local tmpconfig="/tmp/$p${instance:+.$instance}.conf"
-	rm -f "$tmpconfig" 2>/dev/null 2>&1
+	rm -f "$tmpconfig" >/dev/null 2>&1
 
 	return 0
 }
@@ -1114,7 +1111,7 @@ do_setconf() {
 
 	do_checkconf $p $instance
 	[ "$?" != "0" ] && return 1
-
+	[ ! -e "$tmpconfig" ] && echo "No configuration to commit" >&2 && return 0
 	[ -n "$opt_config" ] && mv "$tmpconfig" "$opt_config"
 
 	return 0
@@ -1140,7 +1137,7 @@ do_autostart() {
 			echo "$REPLY"
 			cur=0
 			written=0
-			if [ -n "$instance" ] 
+			if [ -n "$instance" ] ; then
 				if [ "$2" = "$svc" -a "$3" = "$instance" ] ; then
 					cur=1
 				fi
