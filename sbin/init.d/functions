@@ -1044,7 +1044,7 @@ do_testsec() {
 		[ "$?" != "0" ] && [ -z "$REPLY" ] && break
 		set -- $REPLY
 
-       		if [ -n "$1" -a "${1:0:1}" != "#" ] ; then
+       		if [ -n "$1" -a "${1:0:1}" != "#" -a "${1:0:1}" != "." ] ; then
 
 			[ "$1" = "no" ] && shift ;
 			func="$1" ; shift;
@@ -1268,7 +1268,7 @@ parse_cfg() {
 	local name res
 	while read REPLY 2>/dev/null; do
 		set -- $REPLY
-		[ -n "${1##\#*}" ] || continue
+		[ -z "${1##\#*}" -o -z "${1##.*}" ] && continue
 		name=svc_num_$1; res=res_kwd_$1
 		if [ -z "${!name}${!res}" ]; then
 			echo "Bad option '$1' in '$REPLY'"
