@@ -772,8 +772,8 @@ default_service() {
 
 	declare -F set_vars > /dev/null && set_vars
 	# force a last eval on each reserved option so that they can refer to
-	# each other.
-	for i in bin pidfile procname cmdline; do eval eval "$i=\\\"\$$i\\\""; done
+	# each other. This method is faster than the double eval.
+	eval "bin=\"$bin\" pidfile=\"$pidfile\" procname=\"$procname\" cmdline=\"$cmdline\""
 
 	# now if the script defines a fct_end_section() function, let's call
 	# it to fix some values, or extract som from external config files.
