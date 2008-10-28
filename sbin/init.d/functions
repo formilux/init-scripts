@@ -177,15 +177,21 @@ valueof() {
 }
 
 # returns children processes ids.
-# usage: getchild PID ...
+# usage: childrenpid PID ...
+# Returns the PID list in $REPLY
 childrenpid() {
     local found
-    local pid=" $* "
+    local pos
+    local res
 
-    set -- $( exec ps ahxo ppid,pid ) ; while [ $# -gt 0 ] ; do
-	    [ -z "${pid/* $1 */}" ] && found="$found $2" ; shift ; shift ; done
+    res=( $(ps ahxo ppid,pid) )
+    pos=0; count=${#res[*]};
+    while [ $pos -lt $count ] ; do
+	[ ${res[pos]} == $1 ] && found[${#found[*]}]=$2
+	((pos+=2))
+    done
 
-    REPLY="" && [ "$found" ] && REPLY=$found && echo $REPLY
+    REPLY=${found[*]}
 }
 
 
@@ -637,8 +643,7 @@ do_status_with_pidfile() {
 	return 3
     }
     childrenpid $pid > /dev/null
-    local cpid=$*
-    echo "Process $pname${instname:+[$instname]} running : $pid ${cpid:+($cpid)}"
+    echo "Process $pname${instname:+[$instname]} running : $pid ${REPLY:+($REPLY)}"
     REPLY=$pid
     return 0
 }
