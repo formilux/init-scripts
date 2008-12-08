@@ -1291,8 +1291,8 @@ load_config() {
 
     # We already know if the action is known or not, it's not necessary
     # to parse all the config to find that.
-    if ! declare -f do_$ACTION >/dev/null; then
-	if declare -f do_help >/dev/null; then
+    if ! declare -F do_$ACTION >/dev/null; then
+	if declare -F do_help >/dev/null; then
 	    do_help
 	else
 	    echo "Error: Unknown action : $ACTION"
