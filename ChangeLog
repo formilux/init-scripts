@@ -1,3 +1,10 @@
+2008/12/08 : 0.3.41
+      * sysprofiles: must always use the file passed in arguments
+      * functions: version 0.3.40 contained a non-executable functions script.
+      * keyboard: the new kbd package uses stdin which is closed
+      * build: ensure group adm has read+execute perms on scripts
+      * build: ensure that all users can read/execute /sbin/service
+
 2008/12/08 : 0.3.40
 	* functions: add support for reserved keywords starting with "."
 	* functions: minor code simplification in default_service
