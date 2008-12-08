@@ -1289,6 +1289,26 @@ load_config() {
     res_kwd_section=1
     res_kwd_interface=1
 
+    # We already know if the action is known or not, it's not necessary
+    # to parse all the config to find that.
+    if ! declare -f do_$ACTION >/dev/null; then
+	if declare -f do_help >/dev/null; then
+	    do_help
+	else
+	    echo "Error: Unknown action : $ACTION"
+	fi
+	STATUS_RET=1
+	return $STATUS_RET
+    fi
+
+    # ACT_INTERNAL is set for internal actions.
+    unset ACT_INTERNAL ACT_DONE
+    case $ACTION in
+	getsec|getconf|setsec|setconf|checksec|checkconf|cancelsec|cancelconf|testsec|autostart)
+	    ACT_INTERNAL=set
+	    ;;
+    esac
+
     # defines functions for reserved keywords: no, service, section, interface.
     no() { default_no $*; }
     service() { default_service $*; }
@@ -1328,24 +1348,6 @@ load_config() {
 ###################################################################
 # Second half of main entry point. Declaration of default options #
 ###################################################################
-
-# We already know if the action is known or not, it's not necessary
-# to parse all the config to find that.
-if ! declare -f do_$ACTION >/dev/null; then
-    if declare -f do_help >/dev/null; then
-    	do_help
-    else
-	echo "Error: Unknown action : $ACTION"
-    fi
-fi
-
-# ACT_INTERNAL is set for internal actions.
-unset ACT_INTERNAL ACT_DONE
-case $ACTION in
-    getsec|getconf|setsec|setconf|checksec|checkconf|cancelsec|cancelconf|testsec|autostart)
-	ACT_INTERNAL=set
-	;;
-esac
 
 # most services don't need to redefine the keywords "bin", "cmdline",
 # "pidfile", "procname" and "check_interval", so let's initialize them now.
