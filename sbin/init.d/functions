@@ -1059,8 +1059,9 @@ do_testsec() {
 			func="$1" ; shift;
 
 			if [ "$IGNORE_OTHERS" = "" ] ; then
-			# control if first work correspond to function
-				if ! eval "declare -F $func >/dev/null" ; then
+			# control if first word correspond to function
+				if [ -z "$func" -o -n "${func//[[:word:]]}" ] ||
+				   ! declare -F "$func" >/dev/null ; then
 					echo "Error: invalid line $REPLY"
 					return 1
 				fi
@@ -1086,7 +1087,8 @@ do_testsec() {
 				fi
 
 				if [ $found -eq 1 ] ; then
-					if ! eval "declare -F $func >/dev/null" ; then
+					if [ -z "$func" -o -n "${func//[[:word:]]}" ] ||
+					   ! declare -F "$func" >/dev/null ; then
 						echo "Error: invalid line $REPLY"
 						return 1
 					fi
@@ -1291,7 +1293,8 @@ load_config() {
 
     # We already know if the action is known or not, it's not necessary
     # to parse all the config to find that.
-    if ! declare -F do_$ACTION >/dev/null; then
+    if [ -z "$ACTION" -o -n "${ACTION//[[:word:]]}" ] ||
+       ! declare -F do_$ACTION >/dev/null; then
 	if declare -F do_help >/dev/null; then
 	    do_help
 	else
