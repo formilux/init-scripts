@@ -7,7 +7,7 @@ option keyrate	standard_option	30
 
 function do_start {
    loadkeys $opt_keymap
-   kbdrate -r $opt_keyrate
+   kbdrate -r $opt_keyrate </dev/tty0
 }
 
 function do_stop {
