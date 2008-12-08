@@ -1,3 +1,16 @@
+2008/12/08 20:04  willy@wtap
+
+	* released init-scripts-0.3.40-flx0.1
+        * functions: add support for reserved keywords starting with "."
+        * functions: minor code simplification in default_service
+        * functions: remove a double eval in default_service
+        * functions: slightly faster childrenpid relying on an array
+        * sysprofiles : enumerate only autostart instances
+        * functions: provide --list_sections --auto and --list_boot
+        * sysprofiles: use functions instead of hacking with awk
+        * functions: use "declare -F" and not "declare -f" to check actions
+        * functions: better syntax checks on actions and functions
+
 2008/10/07 08:35  willy@wtap
 	* functions: several improvements in section edition
 	* functions: implement the "autostart" action to manipulate the autostart status
