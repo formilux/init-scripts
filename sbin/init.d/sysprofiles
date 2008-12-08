@@ -1,11 +1,8 @@
 #!/bin/bash
-cfgfile=$1
-awk 'BEGIN{svc="";auto=1}
-     /^[[:blank:]]*service/ {if (svc!="" && auto) print svc;svc=$2 " " $3;auto=1}
-     /^[[:blank:]]*(no|)[[:blank:]]*autostart/ {if ($1="no" && $2="autostart") auto=0;else if ($1=="autostart") auto=1}
-     END{if (svc!="" && auto) print svc}' $cfgfile |
-(last=; while read svc rest; do
-   if [ "$svc" != "$last" ]; then
-     /sbin/init.d/$svc -f $cfgfile --auto start </dev/null
-   fi; last=$svc
- done)
+cfgfile=${1:-/etc/config.rc}
+/sbin/init.d/functions --list_sections --auto | (last=; while read svc rest; do
+  if [ "$svc" != "$last" ]; then
+    /sbin/init.d/$svc -f $cfgfile --auto start </dev/null
+  fi
+  last=$svc
+done)
