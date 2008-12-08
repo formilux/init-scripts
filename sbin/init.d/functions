@@ -55,6 +55,12 @@ FORCE_START_STOP=0
 # controls wether the service is being started with --auto
 SVC_AUTO_START=0
 
+# controls whether we just want to list sections
+LIST_SECTIONS=0
+
+# controls whether we just want to list boot status
+LIST_BOOT_STATUS=0
+
 # facility for syslog message
 G_FACILITY=local3
 
@@ -104,8 +110,12 @@ while [ $# -gt 0 ] ; do
 	shift
 	;;
     --list_sections)  # just list sections ("<svcname> [<section>]") then exit
-	awk '/^[[:blank:]]*service/ { print $2 ($3?" "$3:"") }' < $CONFIG
-	exit 0
+	LIST_SECTIONS=1
+	shift
+	;;
+    --list_boot)  # just list boot status
+	LIST_BOOT_STATUS=1
+	shift
 	;;
     --filter_option)	# display only this option in list_options
 	OPTION_FILTER="$2"
@@ -131,6 +141,23 @@ while [ $# -gt 0 ] ; do
 	;;
     esac
 done
+
+# just list sections ("<svcname> [<section>]") then exit
+# if --auto is set, only list auto-start services
+if [ $LIST_SECTIONS = 1 ]; then
+    awk -v onlyauto=$SVC_AUTO_START \
+      'BEGIN{svc="";auto=1} \
+      /^[[:blank:]]*service/ {if (svc!="" && (auto || !onlyauto)) print svc;svc=$2 ($3?" "$3:"");auto=1} \
+      /^[[:blank:]]*(no|)[[:blank:]]*autostart/ {if ($1="no" && $2="autostart") auto=0;else if ($1=="autostart") auto=1} \
+	 END{if (svc!="" && (auto || !onlyauto)) print svc}' $CONFIG
+    exit 0
+elif [ $LIST_BOOT_STATUS = 1 ]; then
+    awk -v onlyauto=$SVC_AUTO_START 'BEGIN{svc="";auto="A"}
+     /^[[:blank:]]*service/ {if (svc!="" && (auto=="A" || !onlyauto)) print auto " " svc;svc=$2 " " $3;auto="A"}
+     /^[[:blank:]]*(no|)[[:blank:]]*autostart/ {if ($1="no" && $2="autostart") auto="M";else if ($1=="autostart") auto="A"}
+     END{if (svc!="" && (auto=="A" || !onlyauto)) print auto " " svc}' $CONFIG
+     exit 0
+fi
 
 # Assign the requested action to ACTION (first arg), and check for internal
 # ones. Default action : start.
