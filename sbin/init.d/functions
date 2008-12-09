@@ -1382,9 +1382,10 @@ option	procname	reserved_option
 option	check_interval	reserved_option	0
 option	autostart	reserved_bool_option	1
 
-# return to caller (. functions) or exit
+# return to caller (. functions) or exit in case of direct call
 set -- $(caller 2>/dev/null)
 if [ -z "$1" -o "$1" = 0 ]; then
+   load_config
    exit 0
 else
    return 0
