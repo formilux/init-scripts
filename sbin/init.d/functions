@@ -1382,31 +1382,10 @@ option	procname	reserved_option
 option	check_interval	reserved_option	0
 option	autostart	reserved_bool_option	1
 
-return 0
-
-######### end of script, here comes some documentation #########
-
-When a service is started, these operations are performed for each section
-containing the same name, and the same instance name if any, or any instance if
-no name is set :
-
-  - options variables are initialized to their default values
-  - if fct_begin_section() exists, it is called with service name and instance name
-  - options are interpreted
-  - bin,pidfile,cmdline,procname are converted through an eval so that they can
-    reference variables options with '$name' or '$opt_name'.
-  - if fct_end_section() exists, it is called with service name and instance name
-  - if do_start() exists, it is called with service name and instance name.
-    Otherwise, the default do_start() function is called with same args. This
-    function calls fct_pre_start() with same args if it exists, just before
-    starting $cmdline, and then fct_post_start() just after. Please note that
-    fct_{pre,post}_start() must return 0 if they succeed, otherwise they will
-    report a failure to start the service.
-
-In case of a stop, everything is the same except do_start() which is replaced
-with do_stop(). This last one also calls fct_pre_stop() and fct_post_stop(),
-but this last one only if the stop is successful.
-
-If the service is started as "service --auto start", the option "autostart" is
-checked, and if set to 0, the service will not start. This is useful to
-differentiate between configured services and enabled services.
+# return to caller (. functions) or exit
+set -- $(caller 2>/dev/null)
+if [ -z "$1" -o "$1" = 0 ]; then
+   exit 0
+else
+   return 0
+fi
