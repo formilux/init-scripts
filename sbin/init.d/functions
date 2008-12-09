@@ -1239,7 +1239,25 @@ do_autostart() {
 	mv $CONFIG.new $CONFIG
 }
 
+# Get list of command for completion
+fct_complete() {
+    declare -F | while read d f cmd; do
+	[ "${cmd#do_}" = "$cmd" ] && continue
+	cmd=${cmd#do_}
+	case $cmd in
+	    complete) continue ;;
+	    status_with_pidfile|stop_with_pidfile) continue ;;
+	    cancelconf|checkconf|setconf) continue ;;
+	    cancelsec|checksec|setset|testsec) continue ;;
+	esac
+	echo $cmd
+    done
+}
 
+do_complete() {
+    fct_complete
+}
+ 
 # 'no' for 'no ... ', disable a service or an option
 default_no() {
     local req=$1
