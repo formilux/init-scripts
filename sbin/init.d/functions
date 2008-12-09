@@ -176,7 +176,7 @@ logit() {
     # echo -n "'"
     # echo -n "$*" | sed -e "s/'/\\\\'/" -e "s/§/' '/g"
     # echo "'"
-    echo "  $*"
+    echo "  $*" >&2
     [ "${1##\#*}" -a "xG_FACILITY" != x ] && \
          logger -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
            "exec[$USER]: $*"
@@ -1318,7 +1318,7 @@ load_config() {
     section() { default_service $*; }
     interface() {
 	if [ "$PNAME" = "network" ]; then
-	    echo "Warning: use of 'interface $1' keyword is deprecated. Use 'section network $1' instead.";
+	    echo "Warning: use of 'interface $1' keyword is deprecated. Use 'section network $1' instead." >&2
 	fi
 	default_service network $*;
     }
@@ -1337,7 +1337,7 @@ load_config() {
     fi
 
     if [ "$SVC_FOUND" != 1 ]; then
-	echo "Warning: service/instance not found in $CONFIG, using default values."
+	echo "Warning: service/instance not found in $CONFIG, using default values." >&2
 	service $PNAME ; service ""
 
         #[ "x$G_FACILITY" != x ] && \
