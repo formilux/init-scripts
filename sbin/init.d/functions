@@ -380,10 +380,12 @@ boolean_option() {
 # The option value is NOT evaluated now, which means that cmdline can refer to
 # $bin if properly quoted. Eg: cmdline '$bin -f $config'
 reserved_option() {
+    local name="$1"
     if [ "x$2" = "x--disable" ]; then
-	eval "$1="
+	eval "$name="
     else
-	eval "$1='$2'"
+	shift
+	eval "$name='$*'"
     fi
 }
 
