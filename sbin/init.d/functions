@@ -336,7 +336,7 @@ recursive_rmmod() {
 		(( mod++ ))
 	    done
 	elif [ "${args[2]}" = "0" ]; then
-	    /sbin/rmmod $1
+	    /sbin/modprobe -r $1
 	    return $?
 	else
 	    # impossible to remove this module (count>0)

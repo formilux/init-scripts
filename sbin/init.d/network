@@ -482,7 +482,7 @@ function do_stop {
 	while [ $arg -gt 0 ]; do
 	    arg=$[$arg-1]
 	    if [ "${opt_modprobe[$arg]}" != "#" ]; then
-		rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
+		modprobe -r ${opt_modprobe[$arg]} >/dev/null 2>&1
 	    fi
 	done
 
@@ -546,9 +546,9 @@ function do_stop {
     while [ $arg -gt 0 ]; do
 	arg=$[$arg-1]
 	if [ "${opt_modprobe[$arg]}" != "#" ]; then
-	    rmmod -r ${opt_modprobe[$arg]} >/dev/null 2>&1
+	    modprobe -r ${opt_modprobe[$arg]} >/dev/null 2>&1
 	else
-	    rmmod -r $instname >/dev/null 2>&1
+	    modprobe -r $instname >/dev/null 2>&1
 	fi
     done
     echo "  ==> stop $svcname${instname:+[$instname]} : Done."
