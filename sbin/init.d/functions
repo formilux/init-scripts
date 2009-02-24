@@ -950,13 +950,13 @@ do_setsec() {
                         print=1
                         if [ -n "$instance" -a $found -eq 0 ] ; then
                                 if [ "$2" = "$svc" -a "$3" = "$instance" ] ; then
-					cat "$tmpconfig"
+					norm_cfg < "$tmpconfig"
 					found=1
 					print=0
 				fi
                         elif [ $found -eq 0 ] ; then
                                 if [ "$2" = "$svc" ] ; then
-					cat "$tmpconfig"
+					norm_cfg < "$tmpconfig"
 					found=1
 					print=0
 				fi
@@ -1301,6 +1301,21 @@ parse_cfg() {
 		fi
 		eval "${REPLY}"
 	done
+}
+
+# Normalize the config parts passed on stdin.
+norm_cfg() {
+	awk '{ \
+	      gsub("[[:space:]]*$", "", $0); \
+	      if (substr($1,0,1)=="#") { print $0; next; } \
+	      gsub("^[[:space:]]*", "", $0); \
+	      if ($1 == "") next; \
+	      if ($1=="no" && $2=="service" || $1=="service") { \
+	          if (sec) print ""; \
+	          print $0; sec=1; } \
+	      else print "    " $0; \
+	     } \
+	     END { print ""; }'
 }
 
 # source configuration file, called last.
