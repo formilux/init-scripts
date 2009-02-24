@@ -330,7 +330,7 @@ recursive_rmmod() {
 	    mod=3
 	    while [ $mod -lt ${#args[@]} ]; do
 		if ! recursive_rmmod ${args[$mod]}; then
-		    echo "Error: could not unload module ${args[$mod]}."
+		    echo "Error: could not unload module ${args[$mod]}." >&2
 		    return 1
 		fi
 		(( mod++ ))
@@ -1273,7 +1273,7 @@ default_no() {
 	    local var_name=svc_num_$req
 	    opt=${!var_name}
 	    if [ -z "$opt" ]; then
-	        echo "Bad option '$req' in 'no $req $*'"
+	        echo "Bad option '$req' in 'no $req $*'" >&2
 		return
 	    fi
 
@@ -1296,7 +1296,7 @@ parse_cfg() {
 		[ -z "${1##\#*}" -o -z "${1##.*}" ] && continue
 		name=svc_num_$1; res=res_kwd_$1
 		if [ -z "${!name}${!res}" ]; then
-			echo "Bad option '$1' in '$REPLY'"
+			echo "Bad option '$1' in '$REPLY'" >&2
 			continue
 		fi
 		eval "${REPLY}"
@@ -1333,7 +1333,7 @@ load_config() {
 	if declare -F do_help >/dev/null; then
 	    do_help
 	else
-	    echo "Error: Unknown action : $ACTION"
+	    echo "Error: Unknown action : $ACTION" >&2
 	fi
 	STATUS_RET=1
 	return $STATUS_RET
