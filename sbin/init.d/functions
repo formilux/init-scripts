@@ -1250,7 +1250,7 @@ fct_complete() {
 	    complete) continue ;;
 	    status_with_pidfile|stop_with_pidfile) continue ;;
 	    cancelconf|checkconf|setconf) continue ;;
-	    cancelsec|checksec|setset|testsec) continue ;;
+	    cancelsec|checksec|setsec|testsec) continue ;;
 	esac
 	echo $cmd
     done
