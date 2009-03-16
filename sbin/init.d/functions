@@ -819,9 +819,11 @@ default_service() {
 	# Internal actions are only called once if the instance is not set.
 	if [ "$SVC_AUTO_START" = 0 -o "$autostart" = 1 ]; then
 		if [ -n "$ACT_INTERNAL" -a -z "${SVC_INSTANCE[0]}" ] ; then
-			[ -z "$ACT_DONE" ] && do_$ACTION $PNAME <&3 3>/dev/null
-			ret=$?
-			ACT_DONE=set
+			if [ -z "$ACT_DONE" ] ; then 
+				do_$ACTION $PNAME <&3 3>/dev/null
+				ret=$?
+				ACT_DONE=set
+			fi
 		else
 			# std case
 			do_$ACTION $PNAME ${SVC_ARGS[*]} <&3 3>/dev/null
