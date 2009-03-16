@@ -1,3 +1,19 @@
+2009/03/16 15:52  willy@wtap
+
+	* released init-scripts-0.3.42-flx0.1
+	* functions: do not output a trailing space after service names
+	* functions: backport from utm-gw: log warnings to stderr
+	* functions: backport from utm-gw: command-line completion
+	* functions: backport from utm-gw: make reserved_option support spaces
+	* functions: clean exit in case of direct call
+	* functions: call load_config in case of direct call.
+	* functions/network: use modprobe -r instead of rmmod
+	* functions: re-indent config sections during a "setsec"
+	* functions: report more errors to stderr instead of stdout
+	* functions: fix typos in default completion function
+	* functions: fix return value for internal actions with multiple instances
+	* functions: ensure that fd 3 is closed before calling do_$ACTION
+
 2008/12/09 00:08  willy@wtap
 
 	* released init-scripts-0.3.41-flx0.1
