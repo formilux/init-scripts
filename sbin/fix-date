@@ -1,0 +1,4 @@
+#!/bin/sh
+if [ /proc/self/. -ot /usr/share/factory/version ]; then
+  /bin/date -s "$(/bin/date -r /usr/share/factory/version)" >/dev/null 2>/dev/null
+fi

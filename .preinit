@@ -67,5 +67,7 @@ md /dev/fs 755
 #ln hda3 /dev/root
 #ln ../hda6 /dev/fs/var
 
+ex /sbin/fix-date
+
 in /sbin/init-sysv
 

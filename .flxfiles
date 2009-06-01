@@ -27,6 +27,7 @@ sbin/rc.S
 sbin/initscript
 sbin/autoraid
 sbin/bootmodules
+sbin/fix-date
 sbin/listpart
 sbin/service
 etc/init.d
