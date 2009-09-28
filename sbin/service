@@ -32,6 +32,28 @@ if [ "$svc" = "network" -a "$1" = "restart" ] ; then
 
 	if [ $vrrp_run -eq 1 ] ; then
 		service "vrrp" "start"
+		[ "$?" == "0" ] && rm -f "$SERVICE_STATUS_DIR/vrrp.apply" 2>/dev/null
+	fi
+
+	exit $ret
+fi
+
+if [ "$svc" = "network" -a "$1" = "reload" ] ; then
+	vrrp_run=0
+	service "vrrp" "status"
+	if [ "$?" = "0" ] ; then
+		vrrp_run=1
+	fi
+
+	/sbin/init.d/$svc "$@"
+	ret="$?"
+	if [ "$ret" = "0" ] ; then
+		rm -f "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+	fi
+
+	if [ $vrrp_run -eq 1 ] ; then
+		service "vrrp" "reload"
+		[ "$?" == "0" ] && rm -f "$SERVICE_STATUS_DIR/vrrp.apply" 2>/dev/null
 	fi
 
 	exit $ret
