@@ -1,6 +1,32 @@
 #!/bin/bash
 SERVICE_STATUS_DIR=/var/state/service
+TEMP=""
 
+mktemp() {
+  TEMP="/tmp/.service.$$.$RANDOM"
+  while ! mkdir -m 0700 "$TEMP"; do
+    TEMP="/tmp/.service.$$.$RANDOM"
+  done
+}
+
+deltemp() {
+  [ -z "$TEMP" ] || rm -rf "$TEMP"
+}
+
+# Normalize the config parts passed on stdin.
+norm_cfg() {
+  awk '{ \
+    gsub("[[:space:]]*$", "", $0); \
+    if (substr($1,0,1)=="#") { next; } \
+    gsub("^[[:space:]]*", "", $0); \
+    if ($1 == "") next; \
+    if ($1=="no" && $2=="service" || $1=="service") { \
+      if (sec) print ""; \
+      print $0; sec=1; } \
+    else print "    " $0; \
+  } \
+  END { print ""; }'
+}
 
 svc="$1" ; shift
 if [ ! -x "/sbin/init.d/$svc" ]; then
@@ -59,13 +85,56 @@ case "$1" in
 			fi
 			exit $ret
 			;;
-	setsec|setconf)
+	setconf)
 			/sbin/init.d/$svc "$@"
-			ret="$?"
-			if [ "$ret" = "0" ] ; then
-				touch "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+			ret=$?
+			if [ $ret != 0 ]; then
+				exit $ret
 			fi
-			exit $ret
+
+			touch "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+			exit 0
+			;;
+	setsec)
+			# keep a copy of config.rc before changes
+			mktemp
+			(touch "$TEMP/config.old" && norm_cfg </etc/config.rc >"$TEMP/config.old") >/dev/null 2>&1
+			/sbin/init.d/$svc "$@"
+			ret=$?
+			(touch "$TEMP/config.new" && norm_cfg </etc/config.rc >"$TEMP/config.new") >/dev/null 2>&1
+
+			if [ $ret != 0 ]; then
+				deltemp
+				exit $ret
+			fi
+
+			# only check significant changes
+			if [ -e "$TEMP/config.old" -a -e "$TEMP/config.new" ] && \
+			   diff -Bbwu "$TEMP"/config.{old,new} >"$TEMP/chg" 2>/dev/null; then
+				# no changes, don't report "need apply"
+				deltemp
+				exit 0
+			fi
+
+			grep '^[-+][^-+]' < "$TEMP/chg" > "$TEMP/chg.diff"
+			grep '^[-]' < "$TEMP/chg.diff" | cut -c2- >"$TEMP/chg.del"
+			grep '^[+]' < "$TEMP/chg.diff" | cut -c2- >"$TEMP/chg.add"
+
+			# now we have removed entries in chg.del and added entries
+			# in chg.add.
+
+			if [ "$svc" = "network" ] ; then
+				# check if something different than VRRP has changed
+				if awk '{if ($1 != "vrrp") exit 1;}' "$TEMP"/chg.{del,add}; then
+					touch "$SERVICE_STATUS_DIR/vrrp.apply" 2>/dev/null
+					deltemp
+					exit 0
+				fi
+			fi
+
+			touch "$SERVICE_STATUS_DIR/$svc$2.apply" 2>/dev/null
+			deltemp
+			exit 0
 			;;
 	needapply)
 			if [ -e "$SERVICE_STATUS_DIR/$svc$2.apply" ] ; then
