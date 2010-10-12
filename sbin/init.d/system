@@ -10,6 +10,7 @@ fi
 option	hostname	standard_option
 option	modprobe 	multiple_option
 option	sysctl		multiple_option
+option	sysclass	multiple_option
 option	file_max	standard_option
 option	rtc		standard_option	"local"		# "local", "utc", "disabled"
 option	rtc_mode	standard_option	"direct"	# "direct", "kernel"
@@ -22,6 +23,7 @@ function do_help {
     echo "   - hostname : string  ;                    ; cur=$opt_hostname"
     echo "   - modprobe : mod arg ; eg: usb-ohci       ; cur='${opt_modprobe[@]}'"
     echo "   - sysctl   : var=val ; eg: kernel.sysrq=0 ; cur='${opt_sysctl[@]}'"
+    echo "   - sysclass : var=val ;                    ; cur='${opt_sysclass[@]}'"
     echo "   - filemax  : integer ;                    ; cur=$opt_filemax"
     echo "   - rtc      : local|utc|disabled ;   local ; cur=$opt_rtc"
     echo "   - rtc_mode : direct|kernel      ;  direct ; cur=$opt_rtc_mode"
@@ -119,6 +121,19 @@ function do_start {
 	    echo "Non-existent sysctl entry : $arg"
 	fi
     done
+
+    for arg in "${opt_sysclass[@]}"; do
+        local sysctl value
+        sysclass="${arg%%=*}"
+        sysclass="${sysclass//.//}"
+        value="${arg##*=}"
+        if [ -e "/sys/class/$sysclass" ]; then
+            echo "$value" > "/sys/class/$sysclass"
+        else
+            echo "Non-existent sysclass entry : $arg"
+        fi
+    done
+
     return 0
 }
 
