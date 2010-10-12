@@ -50,6 +50,7 @@ option	slave		multiple_option
 option	bridge		multiple_option
 option	bridge_stp	boolean_option	0
 option	sysctl		multiple_option
+option	sysclass	multiple_option
 option	modprobe 	multiple_option
 option	lladdr		standard_option
 option	mtu		standard_option
@@ -74,6 +75,7 @@ function do_help {
     echo "   - slave  <interface*>"
     echo "   - bridge <interface*> ; bridge_stp {on|off}"
     echo "   - sysctl <var>=<val>"
+    echo "   - sysclass <var>=<val>"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
     echo "   - lladdr <mac_addr> ; replace <old_if_name>"
@@ -227,6 +229,19 @@ function do_start {
             fi
         done
 
+	# The sysclass refers to /sys/class/net.
+        for arg in "${opt_sysclass[@]}"; do
+            local sysclass value
+            sysclass="${arg%%=*}"
+            sysclass="${sysclass//.//}"
+            value="${arg##*=}"
+            if [ -e "/sys/class/net/$sysclass" ]; then
+                echo "$value" > "/sys/class/net/$sysclass"
+            else
+                echo "Non-existent network sysclass entry : $arg"
+            fi
+        done
+
 	arg=0
 	while [ $arg -lt ${#opt_load[*]} ]; do
 	    if [ "${opt_load[$arg]}" != "#" ]; then
@@ -373,6 +388,18 @@ function do_start {
             echo "$value" > "/proc/sys/net/ipv4/conf/$instname/$sysctl"
         else
             echo "Non-existent network sysctl entry for $instname : $arg"
+        fi
+    done
+
+    for arg in "${opt_sysclass[@]}"; do
+        local sysclass value
+        sysclass="${arg%%=*}"
+        sysclass="${sysclass//.//}"
+        value="${arg##*=}"
+        if [ -e "/sys/class/net/$instname/$sysclass" ]; then
+            echo "$value" > "/sys/class/net/$instname/$sysclass"
+        else
+            echo "Non-existent network sysclass entry for $instname : $arg"
         fi
     done
 
