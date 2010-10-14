@@ -50,7 +50,7 @@ option	slave		multiple_option
 option	bridge		multiple_option
 option	bridge_stp	boolean_option	0
 option	sysctl		multiple_option
-option	sysclass	multiple_option
+option	sysset          multiple_option
 option	modprobe 	multiple_option
 option	lladdr		standard_option
 option	mtu		standard_option
@@ -75,7 +75,7 @@ function do_help {
     echo "   - slave  <interface*>"
     echo "   - bridge <interface*> ; bridge_stp {on|off}"
     echo "   - sysctl <var>=<val>"
-    echo "   - sysclass <var>=<val>"
+    echo "   - sysset <var>=<val>"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
     echo "   - lladdr <mac_addr> ; replace <old_if_name>"
@@ -229,16 +229,16 @@ function do_start {
             fi
         done
 
-	# The sysclass refers to /sys/class/net.
-        for arg in "${opt_sysclass[@]}"; do
-            local sysclass value
-            sysclass="${arg%%=*}"
-            sysclass="${sysclass//.//}"
+	# The sysset refers to /sys/class/net.
+        for arg in "${opt_sysset[@]}"; do
+            local sysset value
+            sysset="${arg%%=*}"
+            sysset="${sysset//.//}"
             value="${arg##*=}"
-            if [ -e "/sys/class/net/$sysclass" ]; then
-                echo "$value" > "/sys/class/net/$sysclass"
+            if [ -e "/sys/class/net/$sysset" ]; then
+                echo "$value" > "/sys/class/net/$sysset"
             else
-                echo "Non-existent network sysclass entry : $arg"
+                echo "Non-existent network sysset entry : $arg"
             fi
         done
 
@@ -391,15 +391,15 @@ function do_start {
         fi
     done
 
-    for arg in "${opt_sysclass[@]}"; do
-        local sysclass value
-        sysclass="${arg%%=*}"
-        sysclass="${sysclass//.//}"
+    for arg in "${opt_sysset[@]}"; do
+        local sysset value
+        sysset="${arg%%=*}"
+        sysset="${sysset//.//}"
         value="${arg##*=}"
-        if [ -e "/sys/class/net/$instname/$sysclass" ]; then
-            echo "$value" > "/sys/class/net/$instname/$sysclass"
+        if [ -e "/sys/class/net/$instname/$sysset" ]; then
+            echo "$value" > "/sys/class/net/$instname/$sysset"
         else
-            echo "Non-existent network sysclass entry for $instname : $arg"
+            echo "Non-existent network sysset entry for $instname : $arg"
         fi
     done
 
