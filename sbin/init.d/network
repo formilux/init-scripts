@@ -46,6 +46,8 @@ option	media		standard_option
 option	duplex		standard_option
 option	speed		standard_option
 option	auto		standard_option
+option  master_type	standard_option
+option  bonding		option_bonding
 option	slave		multiple_option
 option	bridge		multiple_option
 option	bridge_stp	boolean_option	0
@@ -139,11 +141,22 @@ function fct_begin_section {
     arp_list=( )
     route_list=( )
     route6_list=( )
+    bonding_param=( )
+    bonding_value=( )
     addr_idx=0
     addr6_idx=0
     arp_idx=0
     route_idx=0
     route6_idx=0
+    bonding_idx=0
+}
+
+function option_bonding {
+	shift
+	bonding_param[$bonding_idx]="$1"
+	shift
+	bonding_value[$bonding_idx]="$*"
+	bonding_idx=$[$bonding_idx+1]
 }
 
 # usage: ip <ip> {addr|route} ...
@@ -421,6 +434,40 @@ function do_start {
 	ip link set $instname arp off
     fi
 
+    if [ ${#opt_slave[*]} -gt 0 ]; then
+        if [ -e "/sys/class" ] ; then
+            if [ "$opt_master_type" == "bonding" -o -z "$opt_master_type" ] ;then
+                if [ ! -e "/sys/class/net/bonding_masters" ] ; then
+                    echo -n "  ==> modprobe bonding: "
+                    modprobe bonding
+                    if [ ! -e "/sys/class/net/bonding_masters" ] ; then
+                        echo "Failed!"
+                    else
+                        echo "Done."
+                    fi
+                    # Remove default created bond"
+                    echo "-bond0" > /sys/class/net/bonding_masters
+                fi
+                echo -n "  ==> create bonding master $instname: "
+                echo "+$instname" > /sys/class/net/bonding_masters
+                if [ ! -e "/sys/class/net/$instname" ] ; then
+                    echo "Failed!"
+                else
+                    echo "Done."
+                fi
+                # set bonding parameters
+                arg=0
+                while [ $arg -lt $bonding_idx ]; do
+                    if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
+                        echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}"
+                    else
+                        echo "  ==> Bonding parameter ${bonding_param[$arg]} does not exist!"
+                    fi
+                    arg=$[$arg+1]
+                done
+            fi
+        fi
+    fi
     if ! ip link set $instname up; then
 	echo "  ==> start $svcname${instname:+[$instname]} : Failed."
 	return 1
@@ -440,12 +487,23 @@ function do_start {
     if [ ${#opt_slave[*]} -gt 0 ]; then
 	for arg in ${opt_slave[*]}; do
 	    if ! do_status $svcname $arg && ! do_start $svcname $arg >/dev/null 2>&1; then
-		    echo "  ==> FAILED! need to start slave $arg before $instname"
+		echo "  ==> FAILED! need to start slave $arg before $instname"
 	    else
 		ifenslave $instname $arg >/dev/null 2>&1
 		ip addr flush dev $arg >/dev/null 2>&1
 	    fi
 	done
+    fi
+
+    if [ -e "/sys/class/net/$instname/bonding" ] ; then
+        # re-set bonding parameters (some parameters like primary can not be set before slave attachement )
+        arg=0
+        while [ $arg -lt $bonding_idx ]; do
+            if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
+                echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}"
+            fi
+	    arg=$[$arg+1]
+        done
     fi
 
     arg=0
@@ -638,6 +696,11 @@ function do_stop {
 	    modprobe -r $instname >/dev/null 2>&1
 	fi
     done
+
+    # delete bond
+    if [ -e "/sys/class/net/$instname/bonding" ] ; then
+	echo "-$instname" > /sys/class/net/bonding_masters
+    fi
     echo "  ==> stop $svcname${instname:+[$instname]} : Done."
 }
 
