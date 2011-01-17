@@ -33,10 +33,6 @@ function start {
 # Running multiuser part
 echo "Starting Multi-user (`date`)" | tee -a $LOG
 
-# Enable loopback
-ip link set dev lo up
-ip addr add 127.0.0.1/8 dev lo
-
 # Cron should be moved to a proper service script
 
 # Starting 'crond' if exist
