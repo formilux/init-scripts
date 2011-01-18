@@ -472,6 +472,7 @@ function do_start {
 	echo "  ==> start $svcname${instname:+[$instname]} : Failed."
 	return 1
     fi
+    ip addr flush dev $instname >/dev/null 2>&1
 
     if [ "$opt_media" ]; then
 	if [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
