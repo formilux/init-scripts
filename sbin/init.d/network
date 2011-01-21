@@ -471,8 +471,9 @@ function do_start {
     if ! ip link set $instname up; then
 	echo "  ==> start $svcname${instname:+[$instname]} : Failed."
 	return 1
+    elif [ "$instname" = "lo" ] ; then
+       ip addr del dev $instname 127.0.0.1/8 >/dev/null 2>&1
     fi
-    ip addr flush dev $instname >/dev/null 2>&1
 
     if [ "$opt_media" ]; then
 	if [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
