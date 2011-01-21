@@ -491,6 +491,12 @@ function do_start {
 	for arg in ${opt_slave[*]}; do
 	    if ! do_status $svcname $arg && ! do_start $svcname $arg >/dev/null 2>&1; then
 		echo "  ==> FAILED! need to start slave $arg before $instname"
+                ip link set $instname down
+                if [ -e /sys/class/net/bonding_masters ]; then
+                    echo "-$instname" > /sys/class/net/bonding_masters
+                fi
+                echo "  ==> start $svcname${instname:+[$instname]} : Failed."
+                return 1
 	    else
 		ifenslave $instname $arg >/dev/null 2>&1
 		ip addr flush dev $arg >/dev/null 2>&1
