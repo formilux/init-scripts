@@ -82,6 +82,12 @@ unset ${!svc_num_*} ${!res_kwd_*}
 # this is set to $? for the first do_xxx which doesn't return 0
 STATUS_RET=0
 
+# cpumask executable for CPU affinity
+_CPUMASK=/sbin/cpumask
+
+# Test cpumask is executable else unset
+[ -x "$_CPUMASK" ] || unset _CPUMASK
+
 # abort the process after displaying an error message.
 die() {
     echo $* >&2
@@ -456,7 +462,7 @@ do_start() {
     echo "# Starting $p${instname:+[$instname]} ..."
     ret=0
     declare -F fct_pre_start >/dev/null && { fct_pre_start $p $instname ; ret=$?; }
-    [ $ret -eq 0 ] && { logit $cmdline; ret=$?; }
+    [ $ret -eq 0 ] && { logit ${_CPUMASK:+${cpumask:+$_CPUMASK -m $cpumask }}$cmdline; ret=$?; }
     [ $ret -eq 0 ] && declare -F fct_post_start >/dev/null && { fct_post_start $p $instname; ret=$?; }
     [ $ret -eq 0 ] && echo "  ==> start $p${instname:+[$instname]} Done." || \
 		    { echo "  ==> start $p${instname:+[$instname]} Failed." ; return 1 ; }
@@ -806,7 +812,7 @@ default_service() {
 	declare -F set_vars > /dev/null && set_vars
 	# force a last eval on each reserved option so that they can refer to
 	# each other. This method is faster than the double eval.
-	eval "bin=\"$bin\" pidfile=\"$pidfile\" procname=\"$procname\" cmdline=\"$cmdline\""
+	eval "bin=\"$bin\" pidfile=\"$pidfile\" procname=\"$procname\" cmdline=\"$cmdline\"" cpumask=\"$cpumask\"
 
 	# now if the script defines a fct_end_section() function, let's call
 	# it to fix some values, or extract som from external config files.
@@ -846,7 +852,7 @@ default_service() {
             fi
           fi
         fi
-	unset -v RUNNING_SECTION SVC_ARGS bin cmdline pidfile procname $SVC_VARS
+	unset -v RUNNING_SECTION SVC_ARGS bin cpumask cmdline pidfile procname $SVC_VARS
     fi
 
     # if service is the one wished, start it at the end
@@ -1392,6 +1398,7 @@ load_config() {
 # "pidfile", "procname" and "check_interval", so let's initialize them now.
 # This also means that any service can use these options without declaring them.
 option	bin		reserved_option
+option	cpumask		reserved_option
 option	cmdline		reserved_option '$bin'
 option	pidfile		reserved_option
 option	procname	reserved_option
