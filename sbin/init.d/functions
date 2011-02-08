@@ -61,6 +61,9 @@ LIST_SECTIONS=0
 # controls whether we just want to list boot status
 LIST_BOOT_STATUS=0
 
+# logger util
+_LOGGER=${LOGGER:-logger}
+
 # facility for syslog message
 G_FACILITY=local3
 
@@ -183,12 +186,12 @@ logit() {
     # echo "'"
     echo "  $*" >&2
     [ "${1##\#*}" -a "xG_FACILITY" != x ] && \
-         logger -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
+         $_LOGGER -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
            "exec[$USER]: $*"
     $*
     local return=$?
     [ $return != 0 -a "xG_FACILITY" != x ] && \
-         logger -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
+         $_LOGGER -p $G_FACILITY.info -t "flxi[$$].$PNAME" -- \
            "exec.error[$USER]: $return"
     return $return
 }
@@ -844,10 +847,10 @@ default_service() {
           if [ "x$ACTION" = xstart -o "x$ACTION" = xstop \
                -o "x$ACTION" = xrestart ] ; then
             if [ $ret -gt 0 ] ; then
-              logger -p $G_FACILITY.err -t flxi[$$].$PNAME -- \
+              $_LOGGER -p $G_FACILITY.err -t flxi[$$].$PNAME -- \
                   "error[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]} = $ret"
             else
-              logger -p $G_FACILITY.info -t flxi[$$].$PNAME -- \
+              $_LOGGER -p $G_FACILITY.info -t flxi[$$].$PNAME -- \
                   "done[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
             fi
           fi
@@ -1383,7 +1386,7 @@ load_config() {
 	service $PNAME ; service ""
 
         #[ "x$G_FACILITY" != x ] && \
-        #   logger -p $G_FACILITY.warn -t "flxi[$$].$PNAME" -- \
+        #   $_LOGGER -p $G_FACILITY.warn -t "flxi[$$].$PNAME" -- \
         #     "unknown[$USER]: $PNAME $ACTION ${SVC_INSTANCE[*]}"
 	#exit 1
     fi
