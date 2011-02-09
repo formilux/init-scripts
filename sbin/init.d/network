@@ -93,7 +93,7 @@ function set_media {
     case "$2" in
 	auto)
 	    /sbin/mii-diag -r $1 >/dev/null 2>&1 || \
-		/sbin/ethtool -s $1 autoneg on
+		/sbin/ethtool -s $1 autoneg on >/dev/null 2>&1
 	    ;;
 	full|fdx|100full|100fdx)
 	    /sbin/mii-diag -F 100baseTx-FD $1 >/dev/null 2>&1 || \
@@ -401,7 +401,7 @@ function do_start {
 	    if ! do_status "$svcname" "$arg" && ! do_start "$svcname" "$arg" >/dev/null 2>&1; then
 		echo "  ==> FAILED! could not start slave $arg before $instname"
 	    fi
-	    vconfig add "$arg" "${repl#*.}" >/dev/null
+	    vconfig add "$arg" "${repl#*.}" >/dev/null 2>&1
 	    if [ $? -gt 0 ]; then
 		echo "  ==> start $svcname${instname:+[$instname]} : Failed."
 		return 1
@@ -685,7 +685,7 @@ function do_stop {
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
-    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null
+    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null 2>&1
 
     if [ ${#opt_bridge[*]} -gt 0 ]; then
 	for arg in ${opt_bridge[*]}; do
@@ -758,7 +758,7 @@ function do_flush {
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
-    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null
+    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null 2>&1
 
     echo "  ==> flush $svcname${instname:+[$instname]} : Done."
 }
