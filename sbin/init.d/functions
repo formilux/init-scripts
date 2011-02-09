@@ -601,6 +601,11 @@ do_stop() {
     return 0
 }
 
+do_trystop() {
+	do_stop $@
+	return 0
+}
+
 # reload only for started processes
 do_reload_started() {
 
