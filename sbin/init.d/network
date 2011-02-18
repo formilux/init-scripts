@@ -689,7 +689,7 @@ function do_stop {
 
     if [ ${#opt_bridge[*]} -gt 0 ]; then
 	for arg in ${opt_bridge[*]}; do
-	    do_status $svcname $arg && ip li set dev $arg down >/dev/null 2>&1
+	    $0 status "$arg" && ip li set dev $arg down >/dev/null 2>&1
             ip addr flush dev $arg >/dev/null 2>&1
 	    brctl delif $instname $arg >/dev/null 2>&1
         done
