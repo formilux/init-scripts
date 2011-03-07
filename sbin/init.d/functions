@@ -222,7 +222,7 @@ childrenpid() {
     res=( $(ps ahxo ppid,pid) )
     pos=0; count=${#res[*]};
     while [ $pos -lt $count ] ; do
-	[ ${res[pos]} == $1 ] && found[${#found[*]}]=$2
+	[ ${res[pos]} == $1 ] && found[${#found[*]}]=${res[$((pos+1))]}
 	((pos+=2))
     done
 
