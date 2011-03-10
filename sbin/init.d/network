@@ -62,8 +62,9 @@ option	shutdown	boolean_option
 option	vrrp	 	multiple_option
 option	load 		multiple_option
 option	unload 		multiple_option
+option autoconf_script  standard_option
 
-SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx route6_idx arp_idx"
+SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx route6_idx arp_idx ipautoconf"
 
 
 function do_help {
@@ -149,6 +150,7 @@ function fct_begin_section {
     route_idx=0
     route6_idx=0
     bonding_idx=0
+    ipautoconf=""
 }
 
 function option_bonding {
@@ -165,6 +167,9 @@ function option_ip {
     local cmd=$1
     shift
     case "$cmd" in
+	autoconfig)
+	    ipautoconf=1
+	    ;;
 	addr|address)
 	    addr_list[$addr_idx]="$*"
 	    addr_idx=$[$addr_idx+1]
@@ -513,6 +518,18 @@ function do_start {
             fi
 	    arg=$[$arg+1]
         done
+    fi
+
+    if [ -n "$ipautoconf" ] ; then
+        echo "    Autoconfiguring using DHCP request."
+        if [ -z "${opt_autoconf_script}" -o ! -e  "${opt_autoconf_script}" ] ; then
+            echo "    No valid autoconfigure script, fallback on local ip configuration."
+        elif udhcpc -T 1 -t ${opt_dhcptimeout:-10} -i $instname -q -n -s ${opt_autoconf_script} >/dev/null ; then
+            addr_idx=0
+            route_idx=0
+        else
+            echo "    Autoconfigure failed, fallback on local ip configuration."
+        fi
     fi
 
     arg=0
