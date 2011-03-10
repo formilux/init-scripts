@@ -30,6 +30,7 @@ sbin/bootmodules
 sbin/fix-date
 sbin/listpart
 sbin/service
+sbin/udhcpc_autoconfig
 etc/init.d
 etc/initscript
 etc/startup.rc

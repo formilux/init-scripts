@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[ "$1" != "bound" ] && exit 0
+
+ip addr add dev $interface $ip/$subnet
+if [ -n "${router[0]}" ] ; then
+	ip route add dev $interface default via ${router[0]}
+fi
+
+
