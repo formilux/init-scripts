@@ -869,7 +869,6 @@ default_service() {
     if test "x$1" = "x$PNAME" -a \
 	    \( "x$2" = "x${SVC_INSTANCE[0]}" -o "x${SVC_INSTANCE[0]}" = "x" \) ; then
 	# we can test difference between SVC_ARGS and SVC_INSTANCE
-	local include_default=""
 	SVC_FOUND=1
 	RUNNING_SECTION=1
 	shift
@@ -892,8 +891,12 @@ default_service() {
 	    i=$[$i+1]
 	done
 
-	include_default="/etc/default/$PNAME${SVC_ARGS[0]:+.${SVC_ARGS[0]}}"
-	[ -f "$include_default" ] && parse_cfg < $include_default
+
+	if [ -f "/etc/default/$PNAME.${SVC_ARGS[0]}" ] ; then
+		parse_cfg < "/etc/default/$PNAME.${SVC_ARGS[0]}"
+	elif [ -f "/etc/default/$PNAME" ] ; then
+		parse_cfg < "/etc/default/$PNAME"
+	fi
 
 	# now if the script defines a fct_begin_section() function, let's call
 	# it to preset some default values from external config files.
