@@ -351,9 +351,9 @@ function do_start {
 	[ "${opt_bridge_stp}" == "1" ] && brctl stp $instname on
         [ "${opt_bridge_stp}" != "1" ] && brctl setfd $instname 0
 	for arg in ${opt_bridge[*]}; do
-		if ! ( do_status $svcname $arg || \
+		if ! ( $0 status $arg || \
 		       ip li set dev $arg up || \
-		       do_start $svcname $arg ) >/dev/null 2>&1; then
+		       $0 start $arg ) >/dev/null 2>&1; then
 		    echo "  ==> FAILED! need to start iface $arg before $instname"
 		else
 		    brctl addif $instname $arg >/dev/null 2>&1
@@ -403,7 +403,7 @@ function do_start {
 	# We have to create the interface now.
 	if [ -z "${repl//*.*/}" ]; then
 	    arg="${repl%%.*}"
-	    if ! do_status "$svcname" "$arg" && ! do_start "$svcname" "$arg" >/dev/null 2>&1; then
+	    if ( ! $0 status "$arg" && ! $0 start "$arg" ) >/dev/null 2>&1; then
 		echo "  ==> FAILED! could not start slave $arg before $instname"
 	    fi
 	    vconfig add "$arg" "${repl#*.}" >/dev/null 2>&1
@@ -494,7 +494,7 @@ function do_start {
 
     if [ ${#opt_slave[*]} -gt 0 ]; then
 	for arg in ${opt_slave[*]}; do
-	    if ! do_status $svcname $arg && ! do_start $svcname $arg >/dev/null 2>&1; then
+	    if ( ! $0 status "$arg" && ! $0 start "$arg" ) >/dev/null 2>&1; then
 		echo "  ==> FAILED! need to start slave $arg before $instname"
                 ip link set $instname down
                 if [ -e /sys/class/net/bonding_masters ]; then
