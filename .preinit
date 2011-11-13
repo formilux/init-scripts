@@ -1,21 +1,27 @@
 #!/sbin/init <
-# This .preinit is to be copied onto a hard disk to be used as-is.
-# Don't forget to change the links at the bottom !
-# 
-# mem, kmem, null, zero, random, urandom, tty0, tty, console, ptmx, initctl
-# full, fd
+# The interpreter automatically builds : mem, kmem, null, zero,
+# random, urandom, tty0, tty, console, ptmx, initctl, full, fd
+
 mt /proc /proc proc rw
 
-# if we need /tmp now, let's first try to mount /tmp as a tmpfs, next /var if it fails.
-# mt /tmp /tmp tmpfs rw mode=1777,nosuid,nodev
-# |mt /var /var tmpfs rw mode=755
-# md /var/tmp 1777
-# md /var/run 755
+# we first try to mount /tmp as a tmpfs, next /var if it fails.
+# this is dangerous on hard disks, since it will mount /var as
+# a tmpfs if /tmp is non-existent. We would need to check for
+# the existence of /tmp as a link before doing this.
+mt /tmp /tmp tmpfs rw
+|{
+  mt /var /var tmpfs rw mode=755,size=32m
+  ln var/tmp /tmp	# just in case there were nothing
+}
+
+md /var/tmp 1777
+md /var/run 755
 md /dev/pts 755
 
 bl 0600 0 0 3 0 hd[c,ab,64][I,0-16,1]
 bl 0600 0 0 22 0 hd[c,cd,64][I,0-16,1]
 bl 0600 0 0 33 0 hd[c,ef,64][I,0-16,1]
+bl 0600 0 0 254 0 vda[I,0-4,1]
 bl 0600 0 0 8 0 sd[c,a-h,16][I,0-15,1]
 md /dev/rd 755		# DAC960 raid disks (majors 48-55)
 bl 0600 0 0 48 0 rd/c0d[i,0-31,8]
@@ -36,6 +42,7 @@ ch 0600 0 5 3 0 tty[c,p-za-f,16][h,0-f,1]
 ch 0600 0 5 4 1 tty[i,1-12,1]
 bl 0600 0 0 7 0 loop[i,0-9,1]
 bl 0600 0 0 1 0 ram[i,0-9,1]
+bl 0600 0 0 31 0 mtdblock[i,0-9,1]
 ch 0600 0 5 4 64 ttyS[i,0-9,1]
 ch 0600 0 0 108 0 ppp
 ch 0600 0 3 10 1 psaux
@@ -45,6 +52,7 @@ ch 0600 0 0 10 135 rtc
 ch 0600 0 0 10 156 lcd
 ch 0600 0 0 10 185 keypad
 ch 0600 0 0 10 186 smartcard
+# ch 0666 0 0 10 70 crypto
 bl 0400 0 0 1 250 initrd
 ch 0600 0 0 14 0 mixer
 ch 0600 0 0 14 3 dsp
@@ -57,17 +65,17 @@ ln hdc /dev/cdrom
 md /dev/net 755
 ch 0600 0 0 10 200 /dev/net/tun
 
-md /dev/fs 755
-
-# The partitions may be referenced here, so that
-# lilo.conf and fstab only use links.
-#ln hda  /dev/mbr
-#ln hda1 /dev/boot
-#ln hda2 /dev/swap
-#ln hda3 /dev/root
-#ln ../hda6 /dev/fs/var
-
 ex /sbin/fix-date
+
+ex /sbin/depmod -a
+ex /bin/sh -c "/bin/mount -n -o remount,ro /boot/ 2>/dev/null"
+
+te INITSHELL=1
+&rd "You have requested this prompt by appending INITSHELL=1 to the kernel cmd line."
+
+ex /sbin/bootmodules
+ex /sbin/restore-etc
+|ec "Could not find flash file system with a valid configuration."
 
 in /sbin/init-sysv
 
