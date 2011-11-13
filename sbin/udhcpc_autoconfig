@@ -1,10 +1,31 @@
 #!/bin/sh
 
-[ "$1" != "bound" ] && exit 0
+# Action in $1, useful info in environment variables :
+#  - "deconfig" : "interface=eth0"
+#  - "bound"    : "interface=eth0", "ip=192.168.3.12", "subnet=255.255.255.0", "mask=24", "router=192.168.3.1", "dns=192.168.1.2", "hostname=pc2", "domain=company.local", "lease=43200", "dhcptype=5", "serverid=192.168.3.1", "siaddr=192.168.3.1", "boot_file=pxelinux.0"
 
-ip addr add dev $interface $ip/$subnet
+if [ "$1" = "deconfig" ]; then
+	ip addr flush dev $interface
+	ip route flush dev $interface
+	exit 0
+elif [ "$1" != "bound" ]; then
+	exit 1
+fi
+
+ip addr add dev $interface $ip/$mask
 if [ -n "${router[0]}" ] ; then
 	ip route add dev $interface default via ${router[0]}
 fi
 
+if [ -n "$hostname" ]; then
+	hostname "$hostname"
+fi
 
+if [ -n "${dns[0]}" -a -n "$domain" ]; then
+	rm -f /etc/resolv.conf
+	echo "search $domain" > /etc/resolv.conf
+	for srv in ${dns[*]}; do
+		echo "nameserver $srv" >> /etc/resolv.conf
+	done
+fi
+exit 0
