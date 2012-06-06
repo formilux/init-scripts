@@ -31,11 +31,15 @@ function is_loaded {
 # Enables ip forwarding. Returns 0 on success.
 function enable_forwarding {
     echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null
+    [ $? -ne 0 ] && return $?
+    echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null
 }
 
 # Disables ip forwarding. Returns 0 on success.
 function disable_forwarding {
     echo 0 > /proc/sys/net/ipv4/ip_forward 2>/dev/null
+    [ $? -ne 0 ] && return $?
+    echo 0 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null
 }
 
 # checks wether the firewall modules are loaded
