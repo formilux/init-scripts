@@ -353,6 +353,49 @@ recursive_rmmod() {
     done
 }
 
+best_effort_rmmod() {
+	local i
+	local mod
+	local dummy
+	local used
+	local args
+	local trash
+	local -a list
+	local -a modules
+
+	while read mod dummy used args trash ; do
+		eval usedby_${mod//-/_}=\${args//,/ }
+	done < /proc/modules
+
+	i=0
+	modules=( )
+	list=( )
+	while : ; do
+		if [ $# -eq 0 ] ; then
+			if [ $i -gt 0 ] ; then
+				(( i-- ))
+				set -- ${list[@]}
+				continue
+			else
+				break
+			fi
+		fi
+		modules[${modules[@]}]="$1"
+		usedby="usedby_${1}"
+		if [ -n "${!usedby}" ] ; then
+			if [ "${!usedby}" != "-" ] ; then
+				shift;
+				list[$i]="$@"
+				(( i++ ))
+				set -- ${!usedby}
+				continue
+			fi
+		fi
+		shift;
+	done
+	/sbin/modprobe -r "${modules[@]}"
+}
+
 ########################################
 # CONFIGURATION FILE LOADING FUNCTIONS #
 ########################################
