@@ -49,6 +49,7 @@ ch 0600 0 3 10 1 psaux
 ch 0600 0 0 10 144 nvram
 ch 0600 0 0 10 130 watchdog
 ch 0600 0 0 10 135 rtc
+ch 0600 0 0 254 0 rtc0
 ch 0600 0 0 10 156 lcd
 ch 0600 0 0 10 185 keypad
 ch 0600 0 0 10 186 smartcard
