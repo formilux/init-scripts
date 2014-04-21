@@ -1,3 +1,49 @@
+2014/04/21 : 0.4.0
+      * system: implement missing "complete" args
+      * ipforward: new script to enable/disable IP forwarding
+      * ipforward: implemented missing "complete" args in init-scripts
+      * service: improve support for some specific actions
+      * system: support checking config.rc when running system check
+      * service: fixed 2 missing '$' in front of variable name
+      * service: add action "revert" in addition to "apply"
+      * system: set date from firmware when hwclock is too old
+      * service: add support for action "cancel" just like apply and revert
+      * system: use getconf/setconf to manipulate whole config.rc
+      * system: use fixed file names to manipulate configurations
+      * init-scripts: introduce fix-date
+      * service: handle the network reload -> vrrp reload dependence
+      * service: factor out the restart/reload codes
+      * service: handle setsec to modify a config section
+      * network: add support for ip6 addr and ip6 route (svn rev r12928 + r12932)
+      * network: update network script to manage sysclass
+      * system: add support for "sysclass" to set entries into /sys/class
+      * network: use "sysset" instead of "sysclass"
+      * system: rename "sysclass" to "sysset"
+      * network: add support for bonding on kernel 2.6
+      * functions: replace tail +2 by tail -n +2.
+      * rc.M: disable setting up of loopback interface
+      * network: add flush adress on link up to avoid automatic loopback ip creation
+      * network: only remove address 127.0.0.1/8 from the loopback interface
+      * network: configure bonding before configuring vlans
+      * network: unregister bond if slave interface is not ready
+      * functions: manage cpu affinity on init-scripts
+      * functions: logger binary is now set by env in functions script
+      * network: ignore some error messages on autoneg and vconfig
+      * functions: create trystop function
+      * network: fix bug on bridge when testing slave status
+      * functions: childrenpid does not work in function script
+      * network: support autoconfig using udhcpc
+      * udhcpc_autoconfig: introduce minimal configuration script for udhcpc
+      * functions: fix detection of /etc/defaults entries
+      * network: vlan, bridge and bonded interfaces must wait for their slaves
+      * udhcpc_autoconfig: add support for other settings
+      * preinit: backport 2.6 kernel improvements
+      * ipforward: add ipv6 support
+      * functions: reimplement best_effort_rmmod()
+      * preinit: create rtc0 in .preinit
+      * autoconfig: rename the script since it's generic
+      * network: pre-set the autoconfig script
+
 2008/03/16 : 0.3.42
       * functions: do not output a trailing space after service names
       * functions: backport from utm-gw: log warnings to stderr
