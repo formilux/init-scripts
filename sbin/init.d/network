@@ -62,7 +62,7 @@ option	shutdown	boolean_option
 option	vrrp	 	multiple_option
 option	load 		multiple_option
 option	unload 		multiple_option
-option autoconf_script  standard_option
+option	autoconf_script	standard_option	/usr/libexec/ipautoconfig
 
 SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx route6_idx arp_idx ipautoconf"
 
