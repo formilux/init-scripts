@@ -23,6 +23,9 @@ function build_var {
   if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 100 /var/empty; fi
   if [ ! -d /var/adm/. ] ; then ln -s log /var/adm ; fi
 
+  # ensure proper rights are set
+  chmod 755 /var/run /var/state /var/lib /var/spool /var/cache /var/adm >/dev/null 2>&1
+
   sync
 }
 
