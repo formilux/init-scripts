@@ -181,7 +181,7 @@ fi
 
 /bin/rm -f /var/run/utmp /var/run/*.pid >/dev/null 2>&1
 /bin/rm -rf /tmp/* /tmp/.[^.]* /tmp/..?* >/dev/null 2>&1
-touch /var/log/wtmp /var/run/utmp /var/log/lastlog
+touch /var/run/utmp /var/log/lastlog
 
 #if mkdir /tmp/.$BOOTID ; then 
 #  dmesg > /tmp/.$BOOTID/dmesg
