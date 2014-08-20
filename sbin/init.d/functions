@@ -85,11 +85,13 @@ unset ${!svc_num_*} ${!res_kwd_*}
 # this is set to $? for the first do_xxx which doesn't return 0
 STATUS_RET=0
 
-# cpumask executable for CPU affinity
-_CPUMASK=/sbin/cpumask
-
-# Test cpumask is executable else unset
-[ -x "$_CPUMASK" ] || unset _CPUMASK
+if [ -x /usr/bin/taskset ]; then
+  _CPUMASK=cpumask_wrapper
+elif [ -x /sbin/cpumask ]; then
+  _CPUMASK=/sbin/cpumask
+else
+  unset _CPUMASK
+fi
 
 # abort the process after displaying an error message.
 die() {
@@ -394,6 +396,74 @@ best_effort_rmmod() {
 		shift;
 	done
 	/sbin/modprobe -r "${modules[@]}"
+}
+
+# returns a mask of online cpus, or 1 if the mask could not be determined
+cpu_online_mask() {
+	local mask
+	local online
+	local range
+	local min
+	local max
+
+	if [ ! -r /sys/devices/system/cpu/online ]; then
+		echo 1
+		return 0
+	fi
+
+	mask=0
+	online=$(</sys/devices/system/cpu/online)
+	while [ -n "$online" ]; do
+		range="$online"
+		if [ -z "${online##*,*}" ]; then
+			online="${online#*,}"
+			range="${range%,$online}"
+		else
+			online=""
+		fi
+		min="${range%%-*}"
+		max="${range##*-}"
+		while [ $min -le $max ]; do
+			mask="$((mask | (1 << min++)))"
+		done
+	done
+	printf "0x%x\n" $mask
+}
+
+# Usage:
+#    cpumask_wrapper [ -m <mask> ] { -p <pid> | <cmd> [<args>...] }
+cpumask_wrapper() {
+	local online
+	local mask
+	local pid
+
+	# parse -m, -p, --, and silently ignore other args
+	while [ -n "$1" ]; do
+		if [ -n "${1##-*}" ]; then
+			break;
+		elif [ "$1" = "--" ]; then shift; break;
+		elif [ "$1" = "-m" ]; then mask="$2"; shift;
+		elif [ "$1" = "-p" ]; then pid="$2"; shift;
+		fi
+		shift
+	done
+
+	[ -n "$mask" ] || mask=0xffffffff
+	online=$(cpu_online_mask)
+	mask=$((mask & online))
+	if [ $mask -eq 0 ]; then
+		# keep only the first online CPU if none is available
+		mask=$((online & ~(online - 1)))
+	fi
+
+	# taskset only supports hexadecimal masks!
+	mask=$(printf "0x%x" $((mask)))
+
+	if [ -n "$pid" ]; then
+		taskset -p "$mask" "$pid"
+	else
+		taskset "$mask" "$@"
+	fi
 }
 
 ########################################
