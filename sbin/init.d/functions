@@ -382,7 +382,7 @@ best_effort_rmmod() {
 				break
 			fi
 		fi
-		modules[${modules[@]}]="$1"
+		modules[${#modules[@]}]="$1"
 		usedby="usedby_${1}"
 		if [ -n "${!usedby}" ] ; then
 			if [ "${!usedby}" != "-" ] ; then
