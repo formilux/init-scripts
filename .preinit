@@ -3,6 +3,7 @@
 # random, urandom, tty0, tty, console, ptmx, initctl, full, fd
 
 mt /proc /proc proc rw
+mt /sys /sys sysfs rw
 
 # we first try to mount /tmp as a tmpfs, next /var if it fails.
 # this is dangerous on hard disks, since it will mount /var as
