@@ -71,10 +71,12 @@ ex /sbin/fix-date
 ex /sbin/depmod -a
 ex /bin/sh -c "/bin/mount -n -o remount,ro /boot/ 2>/dev/null"
 
+# needed for USB keyboards
+ex /sbin/bootmodules
+
 te INITSHELL=1
 &rd "You have requested this prompt by appending INITSHELL=1 to the kernel cmd line."
 
-ex /sbin/bootmodules
 ex /sbin/restore-etc
 |ec "Could not find flash file system with a valid configuration."
 
