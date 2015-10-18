@@ -43,7 +43,10 @@ ch 0600 0 5 3 0 tty[c,p-za-f,16][h,0-f,1]
 ch 0600 0 5 4 1 tty[i,1-12,1]
 bl 0600 0 0 7 0 loop[i,0-9,1]
 bl 0600 0 0 1 0 ram[i,0-9,1]
-bl 0600 0 0 31 0 mtdblock[i,0-9,1]
+ch 0600 0 0 90 0 mtd[i,0-15,2]
+bl 0600 0 0 31 0 mtdblock[i,0-15,1]
+bl 0600 0 0 179 0 mmcblk[i,0-31,8]
+bl 0600 0 0 179 1 mmcblk[i,0-31,8]p[i,1-7,1]
 ch 0600 0 5 4 64 ttyS[i,0-9,1]
 ch 0600 0 0 108 0 ppp
 ch 0600 0 3 10 1 psaux
