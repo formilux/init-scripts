@@ -75,6 +75,12 @@ ex /sbin/fix-date
 ex /sbin/depmod -a
 ex /bin/sh -c "/bin/mount -n -o remount,ro /boot/ 2>/dev/null"
 
+# pressing the front switch during boot restores factory defaults
+ex /sbin/glinet-button
+&{
+  ex /sbin/restore-factory -f
+}
+
 # needed for USB keyboards
 ex /sbin/bootmodules
 
