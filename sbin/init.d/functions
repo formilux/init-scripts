@@ -332,6 +332,8 @@ recursive_rmmod() {
     local -a args
     local mod
 
+    [ -e /proc/modules ] || return 0
+
     while : ; do
 	args=( $(/sbin/lsmod|tail -n +2|sed "s/([^)]*)//g"|grep "^$1 "|tr -d '\[\]') )
 	[ ${#args[@]} -gt 0 ] || return 0
@@ -364,6 +366,8 @@ best_effort_rmmod() {
 	local trash
 	local -a list
 	local -a modules
+
+	[ -e /proc/modules ] || return 0
 
 	while read mod dummy used args trash ; do
 		eval usedby_${mod//-/_}=\${args//,/ }
