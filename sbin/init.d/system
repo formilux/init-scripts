@@ -40,7 +40,9 @@ function do_date_from_hw {
 	rtc_opt="$rtc_opt --directisa"
     fi
 
-    if [ "$opt_rtc" = "utc" ]; then
+    if [ ! -e /proc/driver/rtc -a ! -e /sys/class/rtc ]; then
+	echo "Setting system time from the image (no RTC)."
+    elif [ "$opt_rtc" = "utc" ]; then
 	echo -n "Setting system time from hardware clock (UTC)... "
 	hwclock --hctosys --noadjfile --utc $rtc_opt
 	echo "Done."
