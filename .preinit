@@ -72,7 +72,8 @@ ch 0600 0 0 10 200 /dev/net/tun
 
 ex /sbin/fix-date
 
-ex /sbin/depmod -a
+st /proc/modules
+&ex /sbin/depmod -a
 ex /bin/sh -c "/bin/mount -n -o remount,ro /boot/ 2>/dev/null"
 
 # pressing the front switch during boot restores factory defaults
