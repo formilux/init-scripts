@@ -11,6 +11,8 @@
 # It accepts modules lists of the form :
 # module_name[:arg=value[,value]*]*[;module_name[:....]]
 
+[ -e /proc/modules ] || exit 0
+
 args=( $(< /proc/cmdline) )
 
 argn=0

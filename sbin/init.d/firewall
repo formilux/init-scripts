@@ -70,9 +70,11 @@ function load_modules {
     local sys1=/proc/sys/net/ipv4
     local sys2=/proc/sys/net/ipv4/netfilter
 
-    /sbin/modprobe ip_tables 2>/dev/null
-    /sbin/modprobe iptable_filter 2>/dev/null
-    /sbin/modprobe iptable_mangle 2>/dev/null
+    if [ -e /proc/modules ]; then
+        /sbin/modprobe ip_tables 2>/dev/null
+        /sbin/modprobe iptable_filter 2>/dev/null
+        /sbin/modprobe iptable_mangle 2>/dev/null
+    fi
 
     if ! grep -q "^filter$" /proc/net/ip_tables_names; then
 	echo "Error: filtering module did not load correctly."
@@ -81,7 +83,9 @@ function load_modules {
     fi
 
     if [ -n "$opt_stateful" ]; then
-    	/sbin/modprobe ip_conntrack hashsize=$opt_hashsize
+	if [ -e /proc/modules ]; then
+	     /sbin/modprobe ip_conntrack hashsize=$opt_hashsize
+	fi
 	if [ ! -e $sys1/ip_conntrack_max -a \
 	     ! -e $sys2/ip_conntrack_max ]; then
 	     echo "Error: conntrack module did not load correctly."
@@ -90,7 +94,9 @@ function load_modules {
 	     return 1
 	fi
 
-    	[ -n "$opt_nat" ] && /sbin/modprobe iptable_nat 2>/dev/null
+	if [ -e /proc/modules ]; then
+	    [ -n "$opt_nat" ] && /sbin/modprobe iptable_nat 2>/dev/null
+	fi
 
 	for arg in "${conntrack_args[@]}"; do
 	    var=${arg%%=*} ; val=${arg##*=}
