@@ -1,5 +1,7 @@
 #!/bin/sh
-if [ /proc/self/. -ot /usr/share/factory/version ]; then
+if [ /proc/self/. -ot /usr/share/factory/version ] ||
+   [ -x /bin/date ] && [ $(/bin/date +%Y) -gt 2038 ]; then
+  date=$(/bin/date)
   /bin/date -s "$(/bin/date -r /usr/share/factory/version)" >/dev/null 2>/dev/null
   msg="Replacing incorrect system date ($date) with build date ($(/bin/date))."
   echo "WARNING: $msg"
