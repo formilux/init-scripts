@@ -100,10 +100,25 @@ if [ $? -gt 1 ] ; then
   mount -rnat nonfs,noproc,notmpfs
   mount -nat tmpfs
 else
-  # mount file systems in fstab (and create an entry for /)
-  # but not NFS because TCP/IP is not yet configured
-  mount -nafvt nonfs,noproc 2>/dev/null|grep '^/'| while read dev ON dir rest;do
-    echo -n "Mounting $dev on $dir... "
+  # mount file systems in fstab (and create an entry for /) but not NFS because
+  # TCP/IP is not yet configured. The problem is that we sometimes need to
+  # create the directories on the fly so we have to enumerate the list of FS
+  # that 'mount' intends to mount, but mount's output varies between versions :
+  # - "mount: /path/mnt already mounted" for older versions
+  # - "/dev/foo on /path/mnt type fstype (options)" for older versions
+  # - "/path/mnt : status" for newer versions, where "/path/mnt" has been
+  #   canonicalized and needs to be disabled by "-c", which is recent.
+  # => "on" on $2 makes the difference.
+  (mount -nafvclt nonfs,noproc || mount -nafvt nonfs,noproc) 2>/dev/null | \
+  grep '^/' | \
+  while read p1 p2 p3 p4 p5 rest; do
+    [ "$p2" = "on" -o "$p3" = "successfully" ] || continue
+    if [ "$p2" = "on" ]; then
+      dir="$p3"
+    else
+      dir="$p1"
+    fi
+    echo -n "Mounting $dir... "
     if [ ! -d "$dir" ]; then
       subdir=${dir%/*}
       while ! mkdir -p "$dir" 2>/dev/null && [ -n "$subdir" ]; do
