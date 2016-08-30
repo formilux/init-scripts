@@ -14,6 +14,8 @@ option	sysset		multiple_option
 option	file_max	standard_option
 option	rtc		standard_option	"local"		# "local", "utc", "disabled"
 option	rtc_mode	standard_option	"direct"	# "direct", "kernel"
+option	nv_auto_mount	boolean_option
+option	nv_auto_format	boolean_option
 
 
 function do_help {
@@ -27,6 +29,8 @@ function do_help {
     echo "   - filemax  : integer ;                    ; cur=$opt_filemax"
     echo "   - rtc      : local|utc|disabled ;   local ; cur=$opt_rtc"
     echo "   - rtc_mode : direct|kernel      ;  direct ; cur=$opt_rtc_mode"
+    echo "   - nv_auto_mount  : boolean ; default=     ; cur=$opt_nv_auto_mount"
+    echo "   - nv_auto_format : boolean ; default=     ; cur=$opt_nv_auto_format"
     echo
     exit 1 
 }
@@ -108,6 +112,18 @@ function do_start {
 	echo "Setting hostname '$opt_hostname'"
 	echo ${opt_hostname%%.*} >/proc/sys/kernel/hostname
 	echo ${opt_hostname#*.} >/proc/sys/kernel/domainname
+    fi
+
+    if [ -n "$opt_nv_auto_mount" ]; then
+        if [ ! -d "/nv/." ] && ! mkdir -p /nv >/dev/null 2>&1; then
+            echo "  ==> start $svcname : cannot mount /nv, directory doesn't exist."
+        elif [ ! -x "/sbin/mount-nv" ]; then
+            echo "  ==> start $svcname : cannot mount /nv, mount-nv isn't installed."
+        else
+           echo -n "Mounting /nv... "
+           /sbin/mount-nv ${opt_nv_auto_format:+--auto-format}
+	   echo "Done."
+        fi
     fi
 
     do_date_from_hw
