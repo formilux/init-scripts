@@ -1125,7 +1125,7 @@ do_checksec() {
 	local svc=$1
 	local instance=$2
 	local tmpconfig="/tmp/$svc${instance:+.$instance}.sec"
-	local length=0
+	local length=-1
 	local hread=0
 	if [ ! -t 0 ] ; then
 	        eval $(
@@ -1140,7 +1140,7 @@ do_checksec() {
                         exit 0
       		)
 		if [ "$hread" = "1" ] ; then
-			[ "$length" = "0" ] && echo "Invalid configuration" >&2 && return 1
+			[ "$length" = "-1" ] && echo "Invalid configuration" >&2 && return 1
        			cat > "$tmpconfig"
 			[ ! -e "$tmpconfig" ] && echo "Unable to retrieve configuration" >&2 && return 1
 			[ "$length" != "$( cat $tmpconfig | wc -c )" ] && echo "Truncated configuration" >&2 && return 1
