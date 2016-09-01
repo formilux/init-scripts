@@ -1450,7 +1450,7 @@ norm_cfg() {
 	          print $0; sec=1; } \
 	      else print "    " $0; \
 	     } \
-	     END { print ""; }'
+	     END { if (NR) print ""; }'
 }
 
 # source configuration file, called last.
