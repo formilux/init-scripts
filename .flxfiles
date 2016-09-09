@@ -28,6 +28,7 @@ sbin/initscript
 sbin/autoraid
 sbin/bootcmd
 sbin/bootmodules
+sbin/detect-board
 sbin/fix-date
 sbin/listpart
 sbin/service

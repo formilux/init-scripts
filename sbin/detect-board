@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# detect the board type
+hw=$(grep '^Hardware' /proc/cpuinfo | cut -f2- -d: | tr 'A-Z' 'a-z')
+if [ -z "${hw##*device tree*}" ]; then
+  if [ -e /proc/device-tree/model ]; then
+    hw=$(tr 'A-Z' 'a-z' < /proc/device-tree/model)
+  else
+    hw=$(dmesg|grep '^\([[][^]]*[]] \)\?Machine:' | cut -f3- -d: | tr 'A-Z' 'a-z')
+  fi
+fi
+[ -n "$hw" ] || hw=$(grep -o '\<board=[^ ]*\>' /proc/cmdline | cut -f2 -d= | tr 'A-Z' 'a-z')
+[ -n "$hw" ] || hw=$(grep '^machine' /proc/cpuinfo | cut -f2- -d: | tr 'A-Z' 'a-z')
+
+hw="${hw# }"
+[ -z "$hw" ] || echo "$hw"
