@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# sbin/bootcmd - Formilux early command loader - v0.2 - 2016-09-09
+#
+# Copyright (C) 2001-2016 Benoit Dolez & Willy Tarreau
+#       mailto: benoit@ant-computing.com,willy@ant-computing.com
+#
+# This program is licenced under GPLv2 ( http://www.gnu.org/licenses/gpl.txt )
+
+# This script looks for strings beginning with 'mount=' and "exec=" in
+# /proc/modules. It accepts commands following these formats :
+#
+#  - mount=dst:src[!opt1[!opt2...]] with src=/dev/xxx, /dir/file or ip:/dir
+#  - exec=cmd[!arg1[!arg2...]]
+
+[ -r /proc/modules ] || exit 0
+
+set -- $(</proc/cmdline)
+
+while [ -n "$1" ]; do
+  cmd="${1%%=*}"
+  arg="${1#*=}"
+  case "$cmd" in
+    "mount")
+        # mount=dst:src
+        if [ -z "${arg##*:*}" ]; then
+            dst="${arg%%:*}"
+            src="${arg#*:}";  src="${src%%\!*}"
+            opt=""
+            if [ -z "${arg%%*\!*}" ]; then
+                opt="${arg#*\!}"
+                opt=${opt//\!/,}
+            fi
+            if [ -z "${src##/dev/*}" ]; then
+                echo "Mounting device $src in $dst..."
+                mkdir -p $dst
+                mount ${opt:+-o $opt} $src $dst/
+            elif [ -z "${src##*:/*}" ]; then
+                echo "Mounting NFS source $src in $dst..."
+                mkdir -p $dst
+                mount ${opt:+-o $opt} -t nfs $src $dst/
+            elif [ -e "$src" ]; then
+                echo "Mounting $src over $dst (bind)..."
+                [ -d "$src/." ] && mkdir -p $dst || touch $dst >/dev/null 2>&1
+                mount ${opt:+-o $opt} --bind $src $dst
+            fi
+        fi
+        ;;
+    "exec")
+        bin="${arg%%\!*}"
+        opt=""
+        if [ -z "${arg%%*\!*}" ]; then
+            opt="${arg#*\!}"
+            opt=${opt//\!/ }
+        fi
+        command $bin $opt
+        ;;
+    esac
+    shift
+done
+exit 0
