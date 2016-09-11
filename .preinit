@@ -5,14 +5,21 @@
 mt /proc /proc proc rw
 mt /sys /sys sysfs rw
 
-# we first try to mount /tmp as a tmpfs, next /var if it fails.
-# this is dangerous on hard disks, since it will mount /var as
-# a tmpfs if /tmp is non-existent. We would need to check for
-# the existence of /tmp as a link before doing this.
-mt /tmp /tmp tmpfs rw
+# On an initramfs we don't need to mount either var or tmp so they are not
+# created during packaging and we just have to create the entries now.
+# When /var exists, /tmp is either a directory and can be autonomous,
+# or a link in which case /var must be a tmpfs.
+st /var/.
+&{
+  mt /tmp /tmp tmpfs rw
+  |{
+    mt /var /var tmpfs rw mode=755,size=32m
+    ln var/tmp /tmp	# just in case there were nothing
+  }
+}
 |{
-  mt /var /var tmpfs rw mode=755,size=32m
-  ln var/tmp /tmp	# just in case there were nothing
+  md /var 755
+  md /tmp 1777
 }
 
 md /var/tmp 1777
