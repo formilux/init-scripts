@@ -83,7 +83,9 @@ ch 0600 0 0 10 200 /dev/net/tun
 ex /sbin/fix-date
 
 st /proc/modules
-&ex /sbin/depmod -a
+&ex /bin/sh -c "shopt -s nullglob; set -- /lib/modules/*; shift && /sbin/depmod -a"
+#&ex /sbin/depmod -a
+
 ex /bin/sh -c "/bin/mount -n -o remount,ro /boot/ 2>/dev/null"
 
 # pressing the front switch during boot restores factory defaults
