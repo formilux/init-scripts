@@ -216,6 +216,43 @@ function option_ip6 {
     esac
 }
 
+# used with config.rc param: cpumask <mask>
+# first arg is the interface to bind. second is mask (considered in decimal by
+# default but hex supported with "0x" prefix).
+function cpumask_bind_iface {
+	local online
+	local mask
+	local iface
+	local c
+
+	iface="$1"; shift
+	mask="$1"; shift
+
+	[ -n "$mask" ] || mask=0xffffffff
+
+	online=$(cpu_online_mask)
+	mask=$((mask & online))
+	if [ $mask -eq 0 ]; then
+		# keep only the first online CPU if none is available
+		mask=$((online & ~(online - 1)))
+		[ $mask -ne 0 ] || return
+	fi
+
+	c=0
+	for i in $(grep -w "$iface" /proc/interrupts | cut -d: -f1) ; do
+		while [ $(((mask >> c) & 1 )) -eq 0 ] ; do
+			((c++))
+		done
+
+		printf "%x\n" "$((1 << c++))" > /proc/irq/$i/smp_affinity
+
+		if [ $((mask >> c)) -eq 0 ] ; then
+			c=0;
+		fi
+	done
+}
+
+
 function do_start {
     local svcname=$1
     local instname=$2
@@ -479,6 +516,10 @@ function do_start {
 	return 1
     elif [ "$instname" = "lo" ] ; then
        ip addr del dev $instname 127.0.0.1/8 >/dev/null 2>&1
+    fi
+
+    if [ -n "$cpumask" ] ; then
+	    cpumask_bind_iface $instname $cpumask
     fi
 
     if [ "$opt_media" ]; then
