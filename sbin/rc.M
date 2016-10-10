@@ -33,6 +33,10 @@ function start {
 # Running multiuser part
 echo "Starting Multi-user (`date`)" | tee -a $LOG
 
+# Configuration Migration
+if [ -x /sbin/update-config ] ; then
+  /sbin/update-config
+fi
 
 # Sourcing base configuration
 if [ -x /etc/startup.rc ] ; then
