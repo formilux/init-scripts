@@ -424,7 +424,7 @@ function do_start {
                 arg=0
                 while [ $arg -lt $bonding_idx ]; do
                     if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
-                        echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}"
+                        echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" 2>/dev/null
                     else
                         echo "  ==> Bonding parameter ${bonding_param[$arg]} does not exist!"
                     fi
@@ -555,7 +555,7 @@ function do_start {
         arg=0
         while [ $arg -lt $bonding_idx ]; do
             if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
-                echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}"
+                echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" 2>/dev/null
             fi
 	    arg=$[$arg+1]
         done
