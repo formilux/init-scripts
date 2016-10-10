@@ -51,6 +51,7 @@ option  bonding		option_bonding
 option	slave		multiple_option
 option	bridge		multiple_option
 option	bridge_stp	boolean_option	0
+option	tunnel_type	standard_option
 option	sysctl		multiple_option
 option	sysset          multiple_option
 option	modprobe 	multiple_option
@@ -381,6 +382,13 @@ function do_start {
         arg=$[$arg+1]
     done
     arg=0
+
+    # create tun/tap
+    if [ -n "$opt_tunnel_type" ] ; then
+        if ! ip tuntap add dev $instname mode $opt_tunnel_type; then
+            echo "  ==> create $instname : failed. Trying anyway."
+        fi
+    fi
 
     # configure the bridge
     if [ ${#opt_bridge[*]} -gt 0 ]; then
@@ -752,6 +760,13 @@ function do_stop {
 	    brctl delif $instname $arg >/dev/null 2>&1
         done
 	brctl delbr $instname
+    fi
+
+    # delete tun/tap
+    if [ -n "$opt_tunnel_type" ] ; then
+        if ! ip tuntap del dev $instname mode $opt_tunnel_type; then
+               echo "  ==> delete $instname : failed. Trying anyway."
+        fi
     fi
 
     arg=${#opt_modprobe[*]}
