@@ -35,7 +35,7 @@ if [ ! -x "/sbin/init.d/$svc" ]; then
 fi
 
 if [ ! -d "$SERVICE_STATUS_DIR" ] ; then
-	mkdir -p "$SERVICE_STATUS_DIR"
+	mkdir -p "$SERVICE_STATUS_DIR" 2>/dev/null
 fi
 
 # dependencies case network restart -> vrrp stop/start
