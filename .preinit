@@ -82,6 +82,8 @@ ch 0600 0 0 10 200 /dev/net/tun
 
 ex /sbin/fix-date
 
+ma 022
+
 st /proc/modules
 &ex /bin/sh -c "shopt -s nullglob; set -- /lib/modules/*; shift && /sbin/depmod -a"
 #&ex /sbin/depmod -a
