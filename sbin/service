@@ -29,7 +29,12 @@ norm_cfg() {
 }
 
 svc="$1" ; shift
-if [ ! -x "/sbin/init.d/$svc" ]; then
+if [ -z "$svc" ]; then
+  echo "Missing service name"
+  exit 1
+fi
+
+if [ ! -f "/sbin/init.d/$svc" -o ! -x "/sbin/init.d/$svc" ]; then
   echo "Service not found : $svc"
   exit 1
 fi
