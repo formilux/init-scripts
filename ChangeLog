@@ -1,3 +1,41 @@
+2017/02/15 : 0.4.1
+      * functions: order the list of modules in best_effort_rmmod
+      * service: check for service name validity
+      * preinit: make use of ls -e for /lib/modules
+      * service: don't complain if the service status dir cannot be created
+      * preinit: don't call "mount -o remount", call "re" instead
+      * preinit: set umask to 022 at boot
+      * rc.M: add a call to the configuration migration if it exists
+      * rc.M: remove long-time dead code
+      * network: add new "tunnel_type" option
+      * network: fix annoying error messages with bonding and wrong params
+      * network: add new cpumask option to network script
+      * functions: always check that cpu mask is not null
+      * preinit: stop calling depmod if there are no modules
+      * preinit: only populate /dev when it's not a devtmpfs
+      * preinit: don't mount /var nor /tmp on initramfs
+      * sbin/detect-board: improve machine name detection
+      * sbin/detect-board: detect the type of board
+      * sbin/bootcmd: extract it from old startup.rc
+      * scripts/functions: do not add a line feed after an empty section
+      * scripts/functions: make setsec support empty sections
+      * system: add support for automatic mount of /nv
+      * rc.S: support newer versions of mount
+      * scripts/fix-date: reject dates later than 2038
+      * scripts/fix-date: emit a log when the date is forced
+      * system: only set time from RTC if there is an RTC
+      * scripts: don't call modprobe if modules are not supported
+      * functions: only run modprobe if /proc/modules exists
+      * preinit: don't run depmod if the system has no modules support
+      * preinit: add support for gl-inet's button to restore factory settings
+      * preinit: fix some mtd/mmc entries in /dev
+      * preinit: mount sysfs by default
+      * preinit: move bootmodules *before* INITSHELL
+      * functions: fix typo in best_effort_rmmod()
+      * functions: make use of taskset when available to set the CPU mask
+      * rc.S: fix permissions on a few /var directories
+      * rc.S: do not create wtmp anymore
+
 2014/04/21 : 0.4.0
       * system: implement missing "complete" args
       * ipforward: new script to enable/disable IP forwarding
