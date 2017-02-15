@@ -85,8 +85,8 @@ ex /sbin/fix-date
 ma 022
 
 st /proc/modules
-&ex /bin/sh -c "shopt -s nullglob; set -- /lib/modules/*; shift && /sbin/depmod -a"
-#&ex /sbin/depmod -a
+&ls -e /lib/modules
+&ex /sbin/depmod -a
 
 re /boot /boot ro
 
