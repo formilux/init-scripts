@@ -399,6 +399,9 @@ best_effort_rmmod() {
 		fi
 		shift;
 	done
+
+	# order the list in reverse load order
+	modules=( $(for i in ${modules[@]}; do echo "^$i "; done | grep -of - /proc/modules) )
 	/sbin/modprobe -r "${modules[@]}"
 }
 
