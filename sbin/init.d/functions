@@ -335,7 +335,7 @@ recursive_rmmod() {
     [ -e /proc/modules ] || return 0
 
     while : ; do
-	args=( $(/sbin/lsmod|tail -n +2|sed "s/([^)]*)//g"|grep "^$1 "|tr -d '\[\]') )
+	args=( $(/sbin/lsmod|tail -n +2|sed "s/([^)]*)//g"|grep "^$1 "|tr -d '\[\]'|tr ',' ' ') )
 	[ ${#args[@]} -gt 0 ] || return 0
 	if [ -n "${args[3]}" ]; then
 	    # there are modules to unload first
