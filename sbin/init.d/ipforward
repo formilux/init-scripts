@@ -30,16 +30,26 @@ function is_loaded {
 
 # Enables ip forwarding. Returns 0 on success.
 function enable_forwarding {
-    echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null
-    [ $? -ne 0 ] && return $?
-    echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null
+    if [ -e /proc/sys/net/ipv4/ip_forward ]; then
+        echo 1 > /proc/sys/net/ipv4/ip_forward
+        [ $? -eq 0 ] || return $?
+    fi
+    if [ -e /proc/sys/net/ipv6/conf/all/forwarding ]; then
+        echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+        [ $? -eq 0 ] || return $?
+    fi
 }
 
 # Disables ip forwarding. Returns 0 on success.
 function disable_forwarding {
-    echo 0 > /proc/sys/net/ipv4/ip_forward 2>/dev/null
-    [ $? -ne 0 ] && return $?
-    echo 0 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null
+    if [ -e /proc/sys/net/ipv4/ip_forward ]; then
+        echo 0 > /proc/sys/net/ipv4/ip_forward
+        [ $? -eq 0 ] || return $?
+    fi
+    if [ -e /proc/sys/net/ipv6/conf/all/forwarding ]; then
+        echo 0 > /proc/sys/net/ipv6/conf/all/forwarding
+        [ $? -eq 0 ] || return $?
+    fi
 }
 
 # checks wether the firewall modules are loaded
