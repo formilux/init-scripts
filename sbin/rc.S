@@ -18,6 +18,7 @@ function build_var {
   if [ ! -d /var/state ] ; then mkdir /var/state ; fi
   if [ ! -d /var/lib ] ; then mkdir /var/lib ; fi
   if [ ! -d /var/spool ] ; then mkdir /var/spool ; fi
+  if [ ! -d /var/lock ] ; then mkdir -m 1777 /var/lock ; fi
   if [ ! -d /var/log ] ; then mkdir /var/log ; chown root:log /var/log; chmod 2751 /var/log; fi
   if [ ! -d /var/cache ] ; then mkdir /var/cache ; fi
   if [ ! -d /var/empty ] ; then mkdir /var/empty ; chmod 100 /var/empty; fi
