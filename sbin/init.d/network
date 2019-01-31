@@ -451,7 +451,7 @@ function do_start {
 	    if ( ! $0 status "$arg" && ! $0 start "$arg" ) >/dev/null 2>&1; then
 		echo "  ==> FAILED! could not start slave $arg before $instname"
 	    fi
-	    vconfig add "$arg" "${repl#*.}" >/dev/null 2>&1
+	    ip link add link "$arg" name "$repl" type vlan id "${repl#*.}" >/dev/null 2>&1
 	    if [ $? -gt 0 ]; then
 		echo "  ==> start $svcname${instname:+[$instname]} : Failed."
 		return 1
@@ -751,7 +751,7 @@ function do_stop {
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
-    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null 2>&1
+    [ -z "${instname//*.*/}" ] && ip link del $instname >/dev/null 2>&1
 
     if [ ${#opt_bridge[*]} -gt 0 ]; then
 	for arg in ${opt_bridge[*]}; do
@@ -831,7 +831,7 @@ function do_flush {
 
     # a dot in an interface name means physical_if.vlanid
     # We have to remove the interface now.
-    [ -z "${instname//*.*/}" ] && vconfig rem $instname >/dev/null 2>&1
+    [ -z "${instname//*.*/}" ] && ip link del $instname >/dev/null 2>&1
 
     echo "  ==> flush $svcname${instname:+[$instname]} : Done."
 }
