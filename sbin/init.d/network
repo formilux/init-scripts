@@ -392,16 +392,16 @@ function do_start {
 
     # configure the bridge
     if [ ${#opt_bridge[*]} -gt 0 ]; then
-	brctl addbr $instname
-	[ "${opt_bridge_stp}" == "1" ] && brctl stp $instname on
-        [ "${opt_bridge_stp}" != "1" ] && brctl setfd $instname 0
+	ip link add $instname type bridge
+	ip link set $instname up
+	[ "${opt_bridge_stp}" == "1" ] && echo 1 >/sys/class/net/$instname/bridge/stp_state
 	for arg in ${opt_bridge[*]}; do
 		if ! ( $0 status $arg || \
 		       ip li set dev $arg up || \
 		       $0 start $arg ) >/dev/null 2>&1; then
 		    echo "  ==> FAILED! need to start iface $arg before $instname"
 		else
-		    brctl addif $instname $arg >/dev/null 2>&1
+		    ip link set dev $arg master $instname >/dev/null 2>&1
 		    ip addr flush dev $arg >/dev/null 2>&1
 		fi
 	done
@@ -757,9 +757,9 @@ function do_stop {
 	for arg in ${opt_bridge[*]}; do
 	    $0 status "$arg" && ip li set dev $arg down >/dev/null 2>&1
             ip addr flush dev $arg >/dev/null 2>&1
-	    brctl delif $instname $arg >/dev/null 2>&1
+	    ip link set $arg nomaster >/dev/null 2>&1
         done
-	brctl delbr $instname
+	ip link del $instname type bridge
     fi
 
     # delete tun/tap
