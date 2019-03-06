@@ -8,6 +8,7 @@
 #     speed {10|100|1000}
 #     duplex {half|full}
 #     auto {on|off}
+#     fctl {auto|both|rx|tx|none}
 #     slave <if> ...
 #     modprobe [module [module_options]]
 #     lladdr <mac_addr>
@@ -46,6 +47,7 @@ option	media		standard_option
 option	duplex		standard_option
 option	speed		standard_option
 option	auto		standard_option
+option	fctl		standard_option
 option  master_type	standard_option
 option  bonding		option_bonding
 option	slave		multiple_option
@@ -76,6 +78,7 @@ function do_help {
     echo "   - ip6 addr <addressv6>, route <destv6> <-|gwv6> [<args>]"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx}"
     echo "   - duplex {half|full} ; speed {10|100|1000} ; auto {on|off}"
+    echo "   - fctl {auto|both|rx|tx|none}"
     echo "   - slave  <interface*>"
     echo "   - bridge <interface*> ; bridge_stp {on|off}"
     echo "   - sysctl <var>=<val>"
@@ -135,6 +138,26 @@ function set_media2 {
     # in this exact order.
     /sbin/mii-diag -F $miistr $1 >/dev/null 2>&1 || \
 	/sbin/ethtool -s $1 ${4:+autoneg $4} ${speed:+speed $speed} ${duplex:+duplex $duplex}
+}
+
+function set_fctl {
+    case "$2" in
+	both)
+	    /sbin/ethtool -A $1 autoneg off rx on tx on >/dev/null 2>&1
+	    ;;
+	rx)
+	    /sbin/ethtool -A $1 autoneg off rx on tx off >/dev/null 2>&1
+	    ;;
+	tx)
+	    /sbin/ethtool -A $1 autoneg off rx off tx on >/dev/null 2>&1
+	    ;;
+	none)
+	    /sbin/ethtool -A $1 autoneg off rx off tx off >/dev/null 2>&1
+	    ;;
+	auto)
+	    /sbin/ethtool -A $1 autoneg on rx on tx on >/dev/null 2>&1
+	    ;;
+    esac
 }
 
 function fct_begin_section {
@@ -539,6 +562,11 @@ function do_start {
     elif [ -n "$opt_speed" -o -n "$opt_duplex" -o -n "$opt_auto" ]; then
 	set_media2 $instname "${opt_speed:--}" "${opt_duplex:--}" "${opt_auto:--}"
 	echo "  ==> Link configuration changed for interface $instname"
+    fi
+
+    if [ -n "$opt_fctl" ]; then
+	set_fctl "$instname" "$opt_fctl"
+	echo "  ==> Flow control management set to '$opt_fctl' for interface $instname"
     fi
 
     if [ ${#opt_slave[*]} -gt 0 ]; then
