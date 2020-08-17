@@ -19,6 +19,8 @@
 #     ip route <ip/mask> <-|gw> [ip args...]
 #     ip6 route <ipv6/mask> <-|gwv6> [ip args...]
 #     vrrp ... (ignored by this script)
+#     wpa_ssid <ssid>
+#     wpa_psk <psk>
 
 # we want ALL instances to stop and restart at once
 if [ "$1" = "restart" ]; then
@@ -65,6 +67,8 @@ option	shutdown	boolean_option
 option	vrrp	 	multiple_option
 option	load 		multiple_option
 option	unload 		multiple_option
+option	wpa_ssid	standard_option
+option	wpa_psk		standard_option
 option	autoconf_script	standard_option	/usr/libexec/ipautoconfig
 
 SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx route6_idx arp_idx ipautoconf"
@@ -88,6 +92,7 @@ function do_help {
     echo "   - lladdr <mac_addr> ; replace <old_if_name>"
     echo "   - mtu <mtu> ; arp {on|off} ; multicast {on|off} ; shutdown"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp>"
+    echo "   - wpa_ssid <ssid> ; wpa_psk <psk>"
     echo
     exit 1 
 }
@@ -597,6 +602,25 @@ function do_start {
         done
     fi
 
+    if [ -e "/sys/class/net/$instname/wireless" -a -n "${opt_wpa_ssid}" ] ; then
+        echo "    Configuring WPA supplicant."
+        rm -f "/var/run/wpa_supplicant-$instname.conf"
+        (
+            echo "network={"
+            echo "	ssid=\"${opt_wpa_ssid}\""
+            echo "	scan_ssid=1"
+            if [ -n "${opt_wpa_psk}" ]; then
+                echo "	key_mgmt=WPA-PSK"
+                echo "	proto=WPA"
+                echo "	psk=\"${opt_wpa_psk}\""
+            else
+                echo "	key_mgmt=NONE"
+            fi
+            echo "}"
+        ) > "/var/run/wpa_supplicant-${instname}.conf"
+        /usr/sbin/wpa_supplicant -B -i"${instname}" -c"/var/run/wpa_supplicant-${instname}.conf" -P"/var/run/wpa_supplicant-${instname}.pid"
+    fi
+
     if [ -n "$ipautoconf" ] ; then
         echo "    Autoconfiguring using DHCP request."
         if [ -z "${opt_autoconf_script}" -o ! -e  "${opt_autoconf_script}" ] ; then
@@ -763,6 +787,12 @@ function do_stop {
 	fi
 	arg=$[$arg+1]
     done
+
+    if [ -e "/var/run/wpa_supplicant-${instname}.pid" ]; then
+        kill $(cat "/var/run/wpa_supplicant-${instname}.pid")
+        rm -f "/var/run/wpa_supplicant-${instname}.pid"
+    fi
+    rm -f "/var/run/wpa_supplicant-${instname}.conf"
 
     ip link set $instname down >/dev/null 2>&1
     ip addr flush dev $instname >/dev/null 2>&1
