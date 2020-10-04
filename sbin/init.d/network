@@ -21,6 +21,9 @@
 #     vrrp ... (ignored by this script)
 #     wpa_ssid <ssid>
 #     wpa_psk <psk>
+#     wpa_key_mgmt <key>
+#     wpa_group <group>
+#     wpa_proto <proto...>
 
 # we want ALL instances to stop and restart at once
 if [ "$1" = "restart" ]; then
@@ -69,6 +72,9 @@ option	load 		multiple_option
 option	unload 		multiple_option
 option	wpa_ssid	standard_option
 option	wpa_psk		standard_option
+option	wpa_group	standard_option
+option	wpa_key_mgmt	standard_option
+option	wpa_proto	standard_option
 option	autoconf_script	standard_option	/usr/libexec/ipautoconfig
 
 SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx route6_idx arp_idx ipautoconf"
@@ -93,6 +99,7 @@ function do_help {
     echo "   - mtu <mtu> ; arp {on|off} ; multicast {on|off} ; shutdown"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp>"
     echo "   - wpa_ssid <ssid> ; wpa_psk <psk>"
+    echo "   - wpa_group <group> ; wpa_key_mgmt <key> ; wpa_proto <proto*>"
     echo
     exit 1 
 }
@@ -611,7 +618,9 @@ function do_start {
             echo "	scan_ssid=1"
             if [ -n "${opt_wpa_psk}" ]; then
                 echo "	key_mgmt=WPA-PSK"
-                echo "	proto=WPA"
+                [ -z "${opt_wpa_key_mgmt}" ] || echo "  key_mgmt=${opt_wpa_key_mgmt}"
+                [ -z "${opt_wpa_group}" ]    || echo "  group=${opt_wpa_group}"
+                echo "	proto=${opt_wpa_proto:-WPA RSN}"
                 echo "	psk=\"${opt_wpa_psk}\""
             else
                 echo "	key_mgmt=NONE"
