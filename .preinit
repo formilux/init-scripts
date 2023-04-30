@@ -96,6 +96,18 @@ ex /sbin/glinet-button
   ex /sbin/restore-factory -f
 }
 
+# load the needed modules for device tree nodes
+te SKIPMODULES=1
+|{
+  st /sys/firmware/devicetree/
+  &st /sbin/dt-modules
+  &{
+    ec "Loading modules for device tree devices..."
+    ex /sbin/dt-modules
+    ec "Done."
+  }
+}
+
 # needed for USB keyboards
 ex /sbin/bootmodules
 
