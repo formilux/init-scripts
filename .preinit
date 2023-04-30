@@ -99,6 +99,14 @@ ex /sbin/glinet-button
 # load the needed modules for device tree nodes
 te SKIPMODULES=1
 |{
+  st /sys/devices/platform/
+  &st /sbin/pf-modules
+  &{
+    ec "Loading modules for platform devices..."
+    ex /sbin/pf-modules
+    ec "Done."
+  }
+
   st /sys/firmware/devicetree/
   &st /sbin/dt-modules
   &{
