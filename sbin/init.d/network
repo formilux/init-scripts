@@ -826,8 +826,9 @@ function do_stop {
     echo "# Stopping $svcname${instname:+[$instname]} ..."
 
     if ! do_status $svcname $instname > /dev/null 2>&1; then
-	# vlan interfaces must disappear
-	if [ -n "${instname//*.*/}" ] || ! ip link show $instname >/dev/null 2>&1; then
+	# vlan, bridges and bonding interfaces must disappear
+	if [ -n "${instname//*.*/}" -a "${opt_type}" != "bridge" -a "${opt_type}" != "bonding" ] || \
+            ! ip link show $instname >/dev/null 2>&1; then
 	    echo "  ==> stop $svcname${instname:+[$instname]} : already stopped."
 	    return 0
         fi
