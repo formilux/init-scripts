@@ -13,7 +13,7 @@
 #     fctl {auto|both|rx|tx|none}
 #     bridge <interface*>
 #     bridge_stp {on|off}
-#     slave <interface*> (implies bonding)
+#     slave <interface*> (implies type=bonding)
 #     bonding <param> <value>
 #     sysctl <var>=<val> (under net or net.ipv4.conf.\$if)
 #     sysset <var>=<val> (under class.net or class.net.\$if)
@@ -25,7 +25,7 @@
 #     arp {on|off}
 #     multicast {on|off}
 #     shutdown
-#     tunnel_type <tun|tap>
+#     type <bonding|tun|tap>
 #     vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*
 #     wpa_ssid <ssid>
 #     wpa_psk <psk>
@@ -64,12 +64,13 @@ option	duplex		standard_option
 option	speed		standard_option
 option	auto		standard_option
 option	fctl		standard_option
-option  master_type	standard_option
+option  master_type	option_alias_type
 option  bonding		option_bonding
 option	slave		multiple_option
 option	bridge		multiple_option
 option	bridge_stp	boolean_option	0
-option	tunnel_type	standard_option
+option	tunnel_type	option_alias_type
+option	type	        standard_option
 option	sysctl		multiple_option
 option	sysset          multiple_option
 option	modprobe 	multiple_option
@@ -107,7 +108,7 @@ function do_help {
     echo "   - fctl {auto|both|rx|tx|none}"
     echo "   - bridge <interface*>"
     echo "   - bridge_stp {on|off}"
-    echo "   - slave <interface*> (implies bonding)"
+    echo "   - slave <interface*> (implies type=bonding)"
     echo "   - bonding <param> <value>"
     echo "   - sysctl <var>=<val> (under net or net.ipv4.conf.\$if)"
     echo "   - sysset <var>=<val> (under class.net or class.net.\$if)"
@@ -119,7 +120,7 @@ function do_help {
     echo "   - arp {on|off}"
     echo "   - multicast {on|off}"
     echo "   - shutdown"
-    echo "   - tunnel_type <tun|tap>"
+    echo "   - type <bonding|tun|tap>"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*"
     echo "   - wpa_ssid <ssid>"
     echo "   - wpa_psk <psk>"
@@ -217,12 +218,25 @@ function fct_begin_section {
     ipautoconf=""
 }
 
+# assign default values to certain options for compatibility purposes
+function fct_end_section {
+    # "slave" implies "type bonding"
+    if [ -z "$opt_type" -a ${#opt_slave[*]} -gt 0 ]; then
+        opt_type="bonding"
+    fi
+}
+
 function option_bonding {
 	shift
 	bonding_param[$bonding_idx]="$1"
 	shift
 	bonding_value[$bonding_idx]="$*"
 	bonding_idx=$[$bonding_idx+1]
+}
+
+# used by master_type and tunnel_type
+function option_alias_type {
+        opt_type="$1"
 }
 
 # usage: ip <ip> {addr|route} ...
@@ -447,8 +461,8 @@ function do_start {
     arg=0
 
     # create tun/tap
-    if [ -n "$opt_tunnel_type" ] ; then
-        if ! ip tuntap add dev $instname mode $opt_tunnel_type; then
+    if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
+        if ! ip tuntap add dev "$instname" mode "$opt_type"; then
             echo "  ==> create $instname : failed. Trying anyway."
         fi
     fi
@@ -472,7 +486,7 @@ function do_start {
 
     if [ -e "/sys/class" ] ; then
         if [ ${#opt_slave[*]} -gt 0 ]; then
-            if [ "$opt_master_type" == "bonding" -o -z "$opt_master_type" ] ;then
+            if [ "$opt_type" == "bonding" ] ;then
                 if [ ! -e "/sys/class/net/bonding_masters" ] ; then
                     echo -n "  ==> modprobe bonding: "
                     modprobe bonding
@@ -858,8 +872,8 @@ function do_stop {
     fi
 
     # delete tun/tap
-    if [ -n "$opt_tunnel_type" ] ; then
-        if ! ip tuntap del dev $instname mode $opt_tunnel_type; then
+    if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
+        if ! ip tuntap del dev "$instname" mode "$opt_type"; then
                echo "  ==> delete $instname : failed. Trying anyway."
         fi
     fi
