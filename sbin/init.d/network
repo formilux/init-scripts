@@ -635,11 +635,15 @@ function do_start {
                 fi
                 echo "  ==> start $svcname${instname:+[$instname]} : Failed."
                 return 1
-	    else
-		ifenslave $instname $arg >/dev/null 2>&1
-		ip addr flush dev $arg >/dev/null 2>&1
-	    fi
-	done
+            elif [ -e "/sys/class/net/$instname/bonding/slaves" ]; then
+                ip li set dev "$arg" down >/dev/null 2>&1
+                ip addr flush dev "$arg" >/dev/null 2>&1
+                echo "+$instname" > /sys/class/net/bonding_masters
+            else
+                ifenslave $instname $arg >/dev/null 2>&1
+                ip addr flush dev $arg >/dev/null 2>&1
+            fi
+        done
     fi
 
     if [ -e "/sys/class/net/$instname/bonding" ] ; then
