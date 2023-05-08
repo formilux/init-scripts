@@ -11,7 +11,7 @@
 #     speed {10|100|1000|...}
 #     media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)
 #     fctl {auto|both|rx|tx|none}
-#     bridge <interface*>
+#     bridge <interface*> (implies type=bridge)
 #     bridge_stp {on|off}
 #     slave <interface*> (implies type=bonding)
 #     bonding <param> <value>
@@ -25,7 +25,7 @@
 #     arp {on|off}
 #     multicast {on|off}
 #     shutdown
-#     type <bonding|tun|tap>
+#     type <bonding|bridge|tun|tap>
 #     vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*
 #     wpa_ssid <ssid>
 #     wpa_psk <psk>
@@ -106,7 +106,7 @@ function do_help {
     echo "   - speed {10|100|1000|...}"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)"
     echo "   - fctl {auto|both|rx|tx|none}"
-    echo "   - bridge <interface*>"
+    echo "   - bridge <interface*> (imples type=bridge)"
     echo "   - bridge_stp {on|off}"
     echo "   - slave <interface*> (implies type=bonding)"
     echo "   - bonding <param> <value>"
@@ -120,7 +120,7 @@ function do_help {
     echo "   - arp {on|off}"
     echo "   - multicast {on|off}"
     echo "   - shutdown"
-    echo "   - type <bonding|tun|tap>"
+    echo "   - type <bonding|bridge|tun|tap>"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*"
     echo "   - wpa_ssid <ssid>"
     echo "   - wpa_psk <psk>"
@@ -220,9 +220,12 @@ function fct_begin_section {
 
 # assign default values to certain options for compatibility purposes
 function fct_end_section {
-    # "slave" implies "type bonding"
     if [ -z "$opt_type" -a ${#opt_slave[*]} -gt 0 ]; then
+        # "slave" implies "type bonding"
         opt_type="bonding"
+    elif [ -z "$opt_type" -a ${#opt_bridge[*]} -gt 0 ]; then
+        # "bridge" implies "type bridge"
+        opt_type="bridge"
     fi
 }
 
@@ -460,28 +463,29 @@ function do_start {
     done
     arg=0
 
-    # create tun/tap
+    # create tun/tap/bridge
     if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
         if ! ip tuntap add dev "$instname" mode "$opt_type"; then
             echo "  ==> create $instname : failed. Trying anyway."
         fi
-    fi
+    elif [ "$opt_type" = "bridge" ]; then
+        ip link add $instname type bridge
+        ip link set $instname up
+        [ "${opt_bridge_stp}" == "1" ] && echo 1 >/sys/class/net/$instname/bridge/stp_state
 
-    # configure the bridge
-    if [ ${#opt_bridge[*]} -gt 0 ]; then
-	ip link add $instname type bridge
-	ip link set $instname up
-	[ "${opt_bridge_stp}" == "1" ] && echo 1 >/sys/class/net/$instname/bridge/stp_state
-	for arg in ${opt_bridge[*]}; do
-		if ! ( $0 status $arg || \
-		       ip li set dev $arg up || \
-		       $0 start $arg ) >/dev/null 2>&1; then
-		    echo "  ==> FAILED! need to start iface $arg before $instname"
-		else
-		    ip link set dev $arg master $instname >/dev/null 2>&1
-		    ip addr flush dev $arg >/dev/null 2>&1
-		fi
-	done
+        # add devices to the bridge
+        if [ ${#opt_bridge[*]} -gt 0 ]; then
+            for arg in ${opt_bridge[*]}; do
+                    if ! ( $0 status $arg || \
+                           ip li set dev $arg up || \
+                           $0 start $arg ) >/dev/null 2>&1; then
+                        echo "  ==> FAILED! need to start iface $arg before $instname"
+                    else
+                        ip link set dev $arg master $instname >/dev/null 2>&1
+                        ip addr flush dev $arg >/dev/null 2>&1
+                    fi
+            done
+        fi
     fi
 
     if [ -e "/sys/class" ] ; then
@@ -536,7 +540,7 @@ function do_start {
 	fi
     fi
 
-    [ ${#opt_bridge[*]} -gt 0 ] || ip link set "$repl" down >/dev/null 2>&1
+    [ "$opt_type" = "bridge" ] || ip link set "$repl" down >/dev/null 2>&1
     ip addr flush dev "$repl" >/dev/null 2>&1
 
     # Rename the interface if needed.
@@ -868,14 +872,15 @@ function do_stop {
             ip addr flush dev $arg >/dev/null 2>&1
 	    ip link set $arg nomaster >/dev/null 2>&1
         done
-	ip link del $instname type bridge
     fi
 
-    # delete tun/tap
+    # delete tun/tap/bridge
     if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
         if ! ip tuntap del dev "$instname" mode "$opt_type"; then
                echo "  ==> delete $instname : failed. Trying anyway."
         fi
+    elif [ "$opt_type" = "bridge" ]; then
+	ip link del $instname type bridge
     fi
 
     arg=${#opt_modprobe[*]}
