@@ -463,7 +463,7 @@ function do_start {
     done
     arg=0
 
-    # create tun/tap/bridge
+    # create tun/tap/bridge/bonding
     if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
         if ! ip tuntap add dev "$instname" mode "$opt_type"; then
             echo "  ==> create $instname : failed. Trying anyway."
@@ -488,40 +488,36 @@ function do_start {
                     fi
             done
         fi
-    fi
-
-    if [ -e "/sys/class" ] ; then
-        if [ ${#opt_slave[*]} -gt 0 ]; then
-            if [ "$opt_type" == "bonding" ] ;then
+    elif [ "$opt_type" = "bonding" ]; then
+        if [ -e "/sys/class" ] ; then
+            if [ ! -e "/sys/class/net/bonding_masters" ] ; then
+                echo -n "  ==> modprobe bonding: "
+                modprobe bonding
                 if [ ! -e "/sys/class/net/bonding_masters" ] ; then
-                    echo -n "  ==> modprobe bonding: "
-                    modprobe bonding
-                    if [ ! -e "/sys/class/net/bonding_masters" ] ; then
-                        echo "Failed!"
-                    else
-                        echo "Done."
-                    fi
-                    # Remove default created bond"
-                    echo "-bond0" > /sys/class/net/bonding_masters
-                fi
-                echo -n "  ==> create bonding master $instname: "
-                echo "+$instname" > /sys/class/net/bonding_masters
-                if [ ! -e "/sys/class/net/$instname" ] ; then
                     echo "Failed!"
                 else
                     echo "Done."
                 fi
-                # set bonding parameters
-                arg=0
-                while [ $arg -lt $bonding_idx ]; do
-                    if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
-                        echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" 2>/dev/null
-                    else
-                        echo "  ==> Bonding parameter ${bonding_param[$arg]} does not exist!"
-                    fi
-                    arg=$[$arg+1]
-                done
+                # Remove default created bond"
+                echo "-bond0" > /sys/class/net/bonding_masters
             fi
+            echo -n "  ==> create bonding master $instname: "
+            echo "+$instname" > /sys/class/net/bonding_masters
+            if [ ! -e "/sys/class/net/$instname" ] ; then
+                echo "Failed!"
+            else
+                echo "Done."
+            fi
+            # set bonding parameters
+            arg=0
+            while [ $arg -lt $bonding_idx ]; do
+                if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
+                    echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" 2>/dev/null
+                else
+                    echo "  ==> Bonding parameter ${bonding_param[$arg]} does not exist!"
+                fi
+                arg=$[$arg+1]
+            done
         fi
     fi
 
