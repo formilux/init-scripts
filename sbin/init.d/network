@@ -1,29 +1,40 @@
 #!/bin/bash
 
 # service network [<ifname>]       # interface name -> int_<ifname>=enable
-#     replace <old_if_name>
-#     ip address <ip/mask> [secondary]  # address for this interface 
-#     ip6 address <ipv6/mask> [secondary]  # address for this interface
-#     media {auto|full|fdx|100full|100fdx|half|hdx|100half|100hdx>
-#     speed {10|100|1000}
-#     duplex {half|full}
+#     ip [[addr <address>] | dhcp | autoconfig] [<args>]
+#     ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]
+#     ip [route <dest> <-|gw>] [<args>]
+#     ip6 [addr <address6>] [<args>]
+#     ip6 [route <dest6> <-|gw6>] [<args>]
 #     auto {on|off}
+#     duplex {half|full}
+#     speed {10|100|1000|...}
+#     media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)
 #     fctl {auto|both|rx|tx|none}
-#     slave <if> ...
-#     modprobe [module [module_options]]
+#     bridge <interface*>
+#     bridge_stp {on|off}
+#     slave <interface*> (implies bonding)
+#     bonding <param> <value>
+#     sysctl <var>=<val> (under net or net.ipv4.conf.\$if)
+#     sysset <var>=<val> (under class.net or class.net.\$if)
+#     modprobe <module> <arg*>
+#     load|unload <command> <arg*>
 #     lladdr <mac_addr>
+#     replace <old_if_name>
 #     mtu <mtu>
-#     [no] arp
-#     [no] multicast
+#     arp {on|off}
+#     multicast {on|off}
 #     shutdown
-#     ip route <ip/mask> <-|gw> [ip args...]
-#     ip6 route <ipv6/mask> <-|gwv6> [ip args...]
-#     vrrp ... (ignored by this script)
+#     tunnel_type <tun|tap>
+#     vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*
 #     wpa_ssid <ssid>
 #     wpa_psk <psk>
-#     wpa_key_mgmt <key>
 #     wpa_group <group>
-#     wpa_proto <proto...>
+#     wpa_key_mgmt <key>
+#     wpa_proto <proto*>
+#     usedhcphostname [0|1] (def: 0)
+#     dhcptimeout <timeout_sec> (def: 10)
+#     autoconf_script <path> (def: /usr/libexec/ipautoconfig)
 
 # we want ALL instances to stop and restart at once
 if [ "$1" = "restart" ]; then
@@ -84,23 +95,40 @@ function do_help {
     echo "Usage: ${0##*/} <status|start|stop|flush|reload|help>"
     echo "List of config.rc options (name, type, default value, current value) :"
     echo
-    echo "   - ip addr <address>, arp <ip> <mac>|pub, dhcp, route <dest> <-|gw> [<args>]"
-    echo "   - ip6 addr <addressv6>, route <destv6> <-|gwv6> [<args>]"
-    echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx}"
-    echo "   - duplex {half|full} ; speed {10|100|1000} ; auto {on|off}"
+    echo "   - ip [[addr <address>] | dhcp | autoconfig] [<args>]"
+    echo "   - ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]"
+    echo "   - ip [route <dest> <-|gw>] [<args>]"
+    echo "   - ip6 [addr <address6>] [<args>]"
+    echo "   - ip6 [route <dest6> <-|gw6>] [<args>]"
+    echo "   - auto {on|off}"
+    echo "   - duplex {half|full}"
+    echo "   - speed {10|100|1000|...}"
+    echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)"
     echo "   - fctl {auto|both|rx|tx|none}"
-    echo "   - slave  <interface*>"
-    echo "   - bridge <interface*> ; bridge_stp {on|off}"
-    echo "   - sysctl <var>=<val>"
-    echo "   - sysset <var>=<val>"
+    echo "   - bridge <interface*>"
+    echo "   - bridge_stp {on|off}"
+    echo "   - slave <interface*> (implies bonding)"
+    echo "   - bonding <param> <value>"
+    echo "   - sysctl <var>=<val> (under net or net.ipv4.conf.\$if)"
+    echo "   - sysset <var>=<val> (under class.net or class.net.\$if)"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
-    echo "   - lladdr <mac_addr> ; replace <old_if_name>"
-    echo "   - mtu <mtu> ; arp {on|off} ; multicast {on|off} ; shutdown"
-    echo "   - vrrp <id|prio|addr|auth_type|pass|garp>"
-    echo "   - wpa_ssid <ssid> ; wpa_psk <psk>"
-    echo "   - wpa_group <group> ; wpa_key_mgmt <key> ; wpa_proto <proto*>"
-    echo
+    echo "   - lladdr <mac_addr>"
+    echo "   - replace <old_if_name>"
+    echo "   - mtu <mtu>"
+    echo "   - arp {on|off}"
+    echo "   - multicast {on|off}"
+    echo "   - shutdown"
+    echo "   - tunnel_type <tun|tap>"
+    echo "   - vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*"
+    echo "   - wpa_ssid <ssid>"
+    echo "   - wpa_psk <psk>"
+    echo "   - wpa_group <group>"
+    echo "   - wpa_key_mgmt <key>"
+    echo "   - wpa_proto <proto*>"
+    echo "   - usedhcphostname [0|1] (def: 0)"
+    echo "   - dhcptimeout <timeout_sec> (def: 10)"
+    echo "   - autoconf_script <path> (def: /usr/libexec/ipautoconfig)"
     exit 1 
 }
 
