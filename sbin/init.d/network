@@ -625,7 +625,7 @@ function do_start {
 	echo "  ==> Flow control management set to '$opt_fctl' for interface $instname"
     fi
 
-    if [ ${#opt_slave[*]} -gt 0 ]; then
+    if [ "${opt_type}" = "bonding" ]; then
 	for arg in ${opt_slave[*]}; do
 	    if ( ! $0 status "$arg" && ! $0 start "$arg" ) >/dev/null 2>&1; then
 		echo "  ==> FAILED! need to start slave $arg before $instname"
