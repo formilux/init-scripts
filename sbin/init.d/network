@@ -11,7 +11,7 @@
 #     speed {10|100|1000|...}
 #     media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)
 #     fctl {auto|both|rx|tx|none}
-#     bridge <interface*> (implies type=bridge)
+#     bridge <interface*> (implies type=bridge, deprecated: use slave instead)
 #     bridge_stp {on|off}
 #     slave <interface*> (implies type=bonding)
 #     bonding <param> <value>
@@ -67,7 +67,7 @@ option	fctl		standard_option
 option  master_type	option_alias_type
 option  bonding		option_bonding
 option	slave		multiple_option
-option	bridge		multiple_option
+option	bridge		option_bridge
 option	bridge_stp	boolean_option	0
 option	tunnel_type	option_alias_type
 option	type	        standard_option
@@ -106,7 +106,7 @@ function do_help {
     echo "   - speed {10|100|1000|...}"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)"
     echo "   - fctl {auto|both|rx|tx|none}"
-    echo "   - bridge <interface*> (imples type=bridge)"
+    echo "   - bridge <interface*> (imples type=bridge, deprecated: use slave instead)"
     echo "   - bridge_stp {on|off}"
     echo "   - slave <interface*> (implies type=bonding)"
     echo "   - bonding <param> <value>"
@@ -223,10 +223,17 @@ function fct_end_section {
     if [ -z "$opt_type" -a ${#opt_slave[*]} -gt 0 ]; then
         # "slave" implies "type bonding"
         opt_type="bonding"
-    elif [ -z "$opt_type" -a ${#opt_bridge[*]} -gt 0 ]; then
+    fi
+}
+
+# remap "bridge" to "slave"
+function option_bridge {
+    if [ -z "$opt_type" ]; then
         # "bridge" implies "type bridge"
         opt_type="bridge"
     fi
+    shift # skip "bridge"
+    multiple_option "slave" "$*"
 }
 
 function option_bonding {
@@ -474,8 +481,8 @@ function do_start {
         [ "${opt_bridge_stp}" == "1" ] && echo 1 >/sys/class/net/$instname/bridge/stp_state
 
         # add devices to the bridge
-        if [ ${#opt_bridge[*]} -gt 0 ]; then
-            for arg in ${opt_bridge[*]}; do
+        if [ ${#opt_slave[*]} -gt 0 ]; then
+            for arg in ${opt_slave[*]}; do
                     if ! ( $0 status $arg || \
                            ip li set dev $arg up || \
                            $0 start $arg ) >/dev/null 2>&1; then
@@ -869,8 +876,8 @@ function do_stop {
     # We have to remove the interface now.
     [ -z "${instname//*.*/}" ] && ip link del $instname >/dev/null 2>&1
 
-    if [ ${#opt_bridge[*]} -gt 0 ]; then
-	for arg in ${opt_bridge[*]}; do
+    if [ "$opt_type" = "bridge" ]; then
+	for arg in ${opt_slave[*]}; do
 	    $0 status "$arg" && ip li set dev $arg down >/dev/null 2>&1
             ip addr flush dev $arg >/dev/null 2>&1
 	    ip link set $arg nomaster >/dev/null 2>&1
