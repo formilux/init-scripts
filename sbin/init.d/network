@@ -644,17 +644,17 @@ function do_start {
                 ip addr flush dev $arg >/dev/null 2>&1
             fi
         done
-    fi
 
-    if [ -e "/sys/class/net/$instname/bonding" ] ; then
-        # re-set bonding parameters (some parameters like primary can not be set before slave attachement )
-        arg=0
-        while [ $arg -lt $bonding_idx ]; do
-            if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
-                echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" 2>/dev/null
-            fi
-	    arg=$[$arg+1]
-        done
+        if [ -e "/sys/class/net/$instname/bonding" ] ; then
+            # re-set bonding parameters (some parameters like primary can not be set before slave attachement )
+            arg=0
+            while [ $arg -lt $bonding_idx ]; do
+                if [ -e "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" ] ; then
+                    echo "${bonding_value[$arg]}" > "/sys/class/net/$instname/bonding/${bonding_param[$arg]}" 2>/dev/null
+                fi
+            arg=$[$arg+1]
+            done
+        fi
     fi
 
     if [ -e "/sys/class/net/$instname/wireless" -a -n "${opt_wpa_ssid}" ] ; then
