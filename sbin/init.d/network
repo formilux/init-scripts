@@ -25,8 +25,11 @@
 #     arp {on|off}
 #     multicast {on|off}
 #     shutdown
-#     type <bonding|bridge|tun|tap>
+#     type <bonding|bridge|tun|tap|wg>
 #     vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*
+#     wg listen_port <port>
+#     wg fwmark <mark>
+#     wg private_key <file>
 #     wpa_ssid <ssid>
 #     wpa_psk <psk>
 #     wpa_group <group>
@@ -82,6 +85,7 @@ option	shutdown	boolean_option
 option	vrrp	 	multiple_option
 option	load 		multiple_option
 option	unload 		multiple_option
+option	wg	 	option_wg
 option	wpa_ssid	standard_option
 option	wpa_psk		standard_option
 option	wpa_group	standard_option
@@ -120,8 +124,11 @@ function do_help {
     echo "   - arp {on|off}"
     echo "   - multicast {on|off}"
     echo "   - shutdown"
-    echo "   - type <bonding|bridge|tun|tap>"
+    echo "   - type <bonding|bridge|tun|tap|wg>"
     echo "   - vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*"
+    echo "   - wg listen_port <port>"
+    echo "   - wg fwmark <mark>"
+    echo "   - wg private_key <file>"
     echo "   - wpa_ssid <ssid>"
     echo "   - wpa_psk <psk>"
     echo "   - wpa_group <group>"
@@ -216,6 +223,9 @@ function fct_begin_section {
     route6_idx=0
     bonding_idx=0
     ipautoconf=""
+    wg_listen_port=
+    wg_fwmark=
+    wg_private_key=
 }
 
 # assign default values to certain options for compatibility purposes
@@ -247,6 +257,27 @@ function option_bonding {
 # used by master_type and tunnel_type
 function option_alias_type {
         opt_type="$1"
+}
+
+# usage: wg [ listen_port <port> ] | [ fwmark <mark> ] | [ private_key <path> ]
+function option_wg {
+    shift
+    local cmd=$1
+    shift
+    case "$cmd" in
+	listen_port)
+	    wg_listen_port="$*"
+	    ;;
+	fwmark)
+	    wg_fwmark="$*"
+	    ;;
+	private_key)
+	    wg_private_key="$*"
+	    ;;
+	*)
+	    echo "Unknown wg command : $cmd $*"
+	    return 1
+    esac
 }
 
 # usage: ip <ip> {addr|route} ...
@@ -470,7 +501,7 @@ function do_start {
     done
     arg=0
 
-    # create tun/tap/bridge/bonding
+    # create tun/tap/bridge/bonding/wg
     if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
         if ! ip tuntap add dev "$instname" mode "$opt_type"; then
             echo "  ==> create $instname : failed. Trying anyway."
@@ -525,6 +556,26 @@ function do_start {
                 fi
                 arg=$[$arg+1]
             done
+        fi
+    elif [ "$opt_type" = "wg" ]; then
+        ret=1
+        if ! ip link add dev "$instname" type wireguard; then
+            echo "  ==> FAILED: could not create wireguard interface $instname."
+        elif ! wg set "$instname" \
+             ${wg_listen_port:+listen-port "$wg_listen_port"} \
+             ${wg_fwmark:+fwmark "$wg_fwmark"} \
+             ${wg_private_key:+private-key "$wg_private_key"}; then
+            echo "  ==> FAILED: could not setup wireguard interface $instname."
+        elif ! ip link set "$instname" up; then
+            echo "  ==> FAILED: could not create wireguard interface $instname."
+        else
+            ret=0
+        fi
+
+        if [ $ret -ne 0 ]; then
+            echo "  ==> start $svcname${instname:+[$instname]} : Failed."
+            ip link delete dev "$instname"
+            return 1
         fi
     fi
 
@@ -833,8 +884,9 @@ function do_stop {
     echo "# Stopping $svcname${instname:+[$instname]} ..."
 
     if ! do_status $svcname $instname > /dev/null 2>&1; then
-	# vlan, bridges and bonding interfaces must disappear
-	if [ -n "${instname//*.*/}" -a "${opt_type}" != "bridge" -a "${opt_type}" != "bonding" ] || \
+	# vlan, bridges, bonding and wg interfaces must disappear
+	if [ -n "${instname//*.*/}" -a "${opt_type}" != "bridge" -a \
+            "${opt_type}" != "bonding" -a "${opt_type}" != "wg" ] || \
             ! ip link show $instname >/dev/null 2>&1; then
 	    echo "  ==> stop $svcname${instname:+[$instname]} : already stopped."
 	    return 0
@@ -884,13 +936,13 @@ function do_stop {
         done
     fi
 
-    # delete tun/tap/bridge
+    # delete tun/tap/bridge/wg
     if [ "$opt_type" = "tun" -o "$opt_type" = "tap" ] ; then
         if ! ip tuntap del dev "$instname" mode "$opt_type"; then
                echo "  ==> delete $instname : failed. Trying anyway."
         fi
-    elif [ "$opt_type" = "bridge" ]; then
-	ip link del $instname type bridge
+    elif [ "$opt_type" = "bridge" -o "$opt_type" = "wg" ]; then
+	ip link del dev "$instname"
     fi
 
     arg=${#opt_modprobe[*]}
