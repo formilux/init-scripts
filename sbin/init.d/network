@@ -5,6 +5,7 @@
 #     ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]
 #     ip [route <dest> <-|gw>] [<args>]
 #     ip6 [addr <address6>] [<args>]
+#     ip6 [neigh <addr6> {<mac>|proxy}] [<args>]
 #     ip6 [route <dest6> <-|gw6>] [<args>]
 #     auto {on|off}
 #     duplex {half|full}
@@ -95,7 +96,7 @@ option	wpa_key_mgmt	standard_option
 option	wpa_proto	standard_option
 option	autoconf_script	standard_option	/usr/libexec/ipautoconfig
 
-SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx route6_idx arp_idx ipautoconf"
+SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx neigh6_idx route6_idx arp_idx ipautoconf"
 
 
 function do_help {
@@ -106,6 +107,7 @@ function do_help {
     echo "   - ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]"
     echo "   - ip [route <dest> <-|gw>] [<args>]"
     echo "   - ip6 [addr <address6>] [<args>]"
+    echo "   - ip6 [neigh <addr6> {<mac>|proxy}] [<args>]"
     echo "   - ip6 [route <dest6> <-|gw6>] [<args>]"
     echo "   - auto {on|off}"
     echo "   - duplex {half|full}"
@@ -223,6 +225,7 @@ function fct_begin_section {
     addr6_idx=0
     arp_idx=0
     route_idx=0
+    neigh6_idx=0
     route6_idx=0
     bonding_idx=0
     ipautoconf=""
@@ -325,6 +328,10 @@ function option_ip6 {
         addr|address)
             addr6_list[$addr6_idx]="$*"
             addr6_idx=$[$addr6_idx+1]
+            ;;
+        neigh*)
+            neigh6_list[$neigh6_idx]="$*"
+            neigh6_idx=$[$neigh6_idx+1]
             ;;
         route)
             route6_list[$route6_idx]="$*"
@@ -823,6 +830,36 @@ function do_start {
 	fi
 	arg=$[$arg+1]
     done
+
+    arg=0
+    while [ $arg -lt $neigh6_idx ]; do
+        local ip mac opts
+        ip=${neigh6_list[$arg]%%[ 	]*}
+        mac=${neigh6_list[$arg]#*[ 	]}
+        opts=
+        if [ -n "${mac}" -a -z "${mac##*[ 	]*}" ]; then
+                opts=${mac#*[ 	]}
+                mac=${mac%%[ 	]*}
+        fi
+
+        # delete possible public entries that might exist. Note that proxy
+        # entries do not appear in "ip neigh", that's a bit confusing and
+        # it does complicate troubleshooting.
+        ip -6 neigh del $ip dev $instname >/dev/null 2>&1
+
+        if [ "$mac" = "proxy" ]; then
+            # Note that forwarding and proxy_ndp are both needed for proxy
+            # entries to work. We're not setting forwarding here as it has
+            # impacts on accept_ra. It should be manually set (and often will
+            # as proxy entries are generally set on routers).
+            (echo 1 > /proc/sys/net/ipv6/conf/$instname/proxy_ndp) 2>/dev/null
+            ip -6 neigh add dev $instname proxy $ip $opts
+        else
+            ip -6 neigh add dev $instname $ip lladdr $mac $opts
+        fi
+        arg=$[$arg+1]
+    done
+
     arg=0
     while [ $arg -lt $route6_idx ]; do
         local dest gw
