@@ -16,6 +16,7 @@
 #     slave <interface*> (implies type=bonding)
 #     bonding <param> <value>
 #     sysctl <var>=<val> (under net or net.ipv4.conf.\$if)
+#     sysctl6 <var>=<val> (under net.ipv6.conf.\$if)
 #     sysset <var>=<val> (under class.net or class.net.\$if)
 #     modprobe <module> <arg*>
 #     load|unload <command> <arg*>
@@ -75,6 +76,7 @@ option	bridge_stp	boolean_option	0
 option	tunnel_type	option_alias_type
 option	type	        standard_option
 option	sysctl		multiple_option
+option	sysctl6		multiple_option
 option	sysset          multiple_option
 option	modprobe 	multiple_option
 option	lladdr		standard_option
@@ -115,6 +117,7 @@ function do_help {
     echo "   - slave <interface*> (implies type=bonding)"
     echo "   - bonding <param> <value>"
     echo "   - sysctl <var>=<val> (under net or net.ipv4.conf.\$if)"
+    echo "   - sysctl6 <var>=<val> (under net.ipv6.conf.\$if)"
     echo "   - sysset <var>=<val> (under class.net or class.net.\$if)"
     echo "   - modprobe <module> <arg*>"
     echo "   - load|unload <command> <arg*>"
@@ -622,7 +625,19 @@ function do_start {
         if [ -e "/proc/sys/net/ipv4/conf/$instname/$sysctl" ]; then
             echo "$value" > "/proc/sys/net/ipv4/conf/$instname/$sysctl"
         else
-            echo "Non-existent network sysctl entry for $instname : $arg"
+            echo "Non-existent IPv4 network sysctl entry for $instname : $arg"
+        fi
+    done
+
+    for arg in "${opt_sysctl6[@]}"; do
+        local sysctl value
+        sysctl="${arg%%=*}"
+        sysctl="${sysctl//.//}"
+        value="${arg##*=}"
+        if [ -e "/proc/sys/net/ipv6/conf/$instname/$sysctl" ]; then
+            echo "$value" > "/proc/sys/net/ipv6/conf/$instname/$sysctl"
+        else
+            echo "Non-existent IPv6 network sysctl entry for $instname : $arg"
         fi
     done
 
