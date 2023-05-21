@@ -1,45 +1,47 @@
 #!/bin/bash
 
 # service network [<ifname>]
-#     ip [[addr <address>] | dhcp | autoconfig] [<args>]
-#     ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]
-#     ip [route <dest> <-|gw>] [<args>]
-#     ip6 [addr <address6>] [<args>]
-#     ip6 [neigh <addr6> {<mac>|proxy}] [<args>]
-#     ip6 [route <dest6> <-|gw6>] [<args>]
-#     auto {on|off}
-#     duplex {half|full}
-#     speed {10|100|1000|...}
-#     media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)
-#     fctl {auto|both|rx|tx|none}
-#     bridge <interface*> (implies type=bridge, deprecated: use slave instead)
-#     bridge_stp {on|off}
-#     slave <interface*> (implies type=bonding)
-#     bonding <param> <value>
-#     sysctl <var>=<val> (under net or net.ipv4.conf.\$if)
-#     sysctl6 <var>=<val> (under net.ipv6.conf.\$if)
-#     sysset <var>=<val> (under class.net or class.net.\$if)
-#     modprobe <module> <arg*>
-#     load|unload <command> <arg*>
-#     lladdr <mac_addr>
-#     replace <old_if_name>
-#     mtu <mtu>
-#     arp {on|off}
-#     multicast {on|off}
-#     shutdown
-#     type <bonding|bridge|tun|tap|wg>
-#     vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*
-#     wg listen_port <port>
-#     wg fwmark <mark>
-#     wg private_key <file>
-#     wpa_ssid <ssid>
-#     wpa_psk <psk>
-#     wpa_group <group>
-#     wpa_key_mgmt <key>
-#     wpa_proto <proto*>
-#     usedhcphostname [0|1] (def: 0)
-#     dhcptimeout <timeout_sec> (def: 10)
-#     autoconf_script <path> (def: /usr/libexec/ipautoconfig)
+#     arp {on|off} : enable/disable ARP for IPv4"
+#     auto {on|off} : enable/disable link speed auto-negotiation"
+#     autoconf_script <path> : script to run with 'ip autoconfig' (def: /usr/libexec/ipautoconfig)"
+#     bonding <param> <value> : set bonding parameter (primary, mode, updelay, downdelay, ...)"
+#     bridge <interface*> : deprecated, imples type=bridge. Use type and slave instead"
+#     bridge_stp {on|off} : enable/disable spanning tree protocol on bridge"
+#     dhcptimeout <timeout_sec> : set timeout for ip dhcp and ip autoconfig (def: 10)"
+#     duplex {half|full} : force link duplex"
+#     fctl {auto|both|rx|tx|none} : enable/disable sending and processing of flow control frames"
+#     ip [[addr <address>] | dhcp | autoconfig] [<args>] : set IPv4 address and mask"
+#     ip [dhcp | autoconfig] : manage IPv4 address using DHCP, or only once at boot (autoconfig)"
+#     ip [route <dest> <-|gw>] [<args>] : set IPv4 routes"
+#     ip [{arp|neigh} <ip> {<mac>|pub}] [<args>] : set IPv4 ARP entry"
+#     ip6 [addr <address6>] [<args>] : set IPv6 address"
+#     ip6 [neigh <addr6> {<mac>|proxy}] [<args>] : set IPv6 neighbor (IPv6 equiv to ARP)"
+#     ip6 [route <dest6> <-|gw6>] [<args>] : set IPv6 routes"
+#     lladdr <mac_addr> : set interface MAC address"
+#     load|unload <command> <arg*> : commands to be executed when interface is brought up/down"
+#     media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated, use speed & duplex)"
+#     modprobe <module> <arg*> : load this module with optional arguments"
+#     mtu <mtu> : set interface MTU"
+#     multicast {on|off} : enable/disable receiving of multicasts"
+#     replace <old_if_name> : use and rename interface old_if_name if not found"
+#     shutdown : disable this interface"
+#     slave <interface*> (implies type=bonding) : specify slave interfaces for bond/bridge"
+#     speed {10|100|1000|...} : set link speed"
+#     sysctl <var>=<val> : set network sysctl in root instance or net.ipv4.conf.\$if for interfaces"
+#     sysctl6 <var>=<val>: set net.ipv6.conf.\$if sysctl for interfaces"
+#     sysset <var>=<val>: set param in sys.class.net for root or sys.class.net.\$if for interfaces"
+#     type <bonding|bridge|tun|tap|wg> : specify interface type"
+#     usedhcphostname [0|1] : allow to set the host name from DHCP (def: 0)"
+#     vrrp instance <inst> [setting value]* : set VRRP setting for VRRP instance"
+#     vrrp [id|prio|address|no-address|auth_type|passwod|garp|v2|v3|...] [...]* : see service vrrp "
+#     wg fwmark <mark> : mark outgoing WG packets with this FW mark"
+#     wg listen_port <port> : make WG listen on this port"
+#     wg private_key <file> : the the WG private key from this file"
+#     wpa_group <group> : set the 'group' WPA parameter (dev: nond)"
+#     wpa_key_mgmt <key> : set the 'key_mgmt' WPA parameter (def: NONE)"
+#     wpa_proto <proto*> : set the 'proto' WPA parameter (def:WPA RSN)"
+#     wpa_psk <psk> : set the 'psk' WPA parameter (def: none)"
+#     wpa_ssid <ssid> : set the 'ssid' WPA parameter (non-empty enables WPA)"
 
 # Notes for IPv6 addressing: accept_ra defaults to 1 which means that an
 # address and a default route may be assigned by a local default gateway for
@@ -107,47 +109,48 @@ SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_id
 
 function do_help {
     echo "Usage: ${0##*/} <status|start|stop|flush|reload|help>"
-    echo "List of config.rc options (name, type, default value, current value) :"
-    echo
-    echo "   - ip [[addr <address>] | dhcp | autoconfig] [<args>]"
-    echo "   - ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]"
-    echo "   - ip [route <dest> <-|gw>] [<args>]"
-    echo "   - ip6 [addr <address6>] [<args>]"
-    echo "   - ip6 [neigh <addr6> {<mac>|proxy}] [<args>]"
-    echo "   - ip6 [route <dest6> <-|gw6>] [<args>]"
-    echo "   - auto {on|off}"
-    echo "   - duplex {half|full}"
-    echo "   - speed {10|100|1000|...}"
-    echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated)"
-    echo "   - fctl {auto|both|rx|tx|none}"
-    echo "   - bridge <interface*> (imples type=bridge, deprecated: use slave instead)"
-    echo "   - bridge_stp {on|off}"
-    echo "   - slave <interface*> (implies type=bonding)"
-    echo "   - bonding <param> <value>"
-    echo "   - sysctl <var>=<val> (under net or net.ipv4.conf.\$if)"
-    echo "   - sysctl6 <var>=<val> (under net.ipv6.conf.\$if)"
-    echo "   - sysset <var>=<val> (under class.net or class.net.\$if)"
-    echo "   - modprobe <module> <arg*>"
-    echo "   - load|unload <command> <arg*>"
-    echo "   - lladdr <mac_addr>"
-    echo "   - replace <old_if_name>"
-    echo "   - mtu <mtu>"
-    echo "   - arp {on|off}"
-    echo "   - multicast {on|off}"
-    echo "   - shutdown"
-    echo "   - type <bonding|bridge|tun|tap|wg>"
-    echo "   - vrrp <id|prio|addr|auth_type|pass|garp|instance> [...]*"
-    echo "   - wg listen_port <port>"
-    echo "   - wg fwmark <mark>"
-    echo "   - wg private_key <file>"
-    echo "   - wpa_ssid <ssid>"
-    echo "   - wpa_psk <psk>"
-    echo "   - wpa_group <group>"
-    echo "   - wpa_key_mgmt <key>"
-    echo "   - wpa_proto <proto*>"
-    echo "   - usedhcphostname [0|1] (def: 0)"
-    echo "   - dhcptimeout <timeout_sec> (def: 10)"
-    echo "   - autoconf_script <path> (def: /usr/libexec/ipautoconfig)"
+    echo "List of config.rc options (name, type, default value) :"
+    echo "   - arp {on|off} : enable/disable ARP for IPv4"
+    echo "   - auto {on|off} : enable/disable link speed auto-negotiation"
+    echo "   - autoconf_script <path> : script to run with 'ip autoconfig' (def: /usr/libexec/ipautoconfig)"
+    echo "   - bonding <param> <value> : set bonding parameter (primary, mode, updelay, downdelay, ...)"
+    echo "   - bridge <interface*> : deprecated, imples type=bridge. Use type and slave instead"
+    echo "   - bridge_stp {on|off} : enable/disable spanning tree protocol on bridge"
+    echo "   - dhcptimeout <timeout_sec> : set timeout for ip dhcp and ip autoconfig (def: 10)"
+    echo "   - duplex {half|full} : force link duplex"
+    echo "   - fctl {auto|both|rx|tx|none} : enable/disable sending and processing of flow control frames"
+    echo "   - ip [[addr <address>] | dhcp | autoconfig] [<args>] : set IPv4 address and mask"
+    echo "   - ip [dhcp | autoconfig] : manage IPv4 address using DHCP, or only once at boot (autoconfig)"
+    echo "   - ip [route <dest> <-|gw>] [<args>] : set IPv4 routes"
+    echo "   - ip [{arp|neigh} <ip> {<mac>|pub}] [<args>] : set IPv4 ARP entry"
+    echo "   - ip6 [addr <address6>] [<args>] : set IPv6 address"
+    echo "   - ip6 [neigh <addr6> {<mac>|proxy}] [<args>] : set IPv6 neighbor (IPv6 equiv to ARP)"
+    echo "   - ip6 [route <dest6> <-|gw6>] [<args>] : set IPv6 routes"
+    echo "   - lladdr <mac_addr> : set interface MAC address"
+    echo "   - load|unload <command> <arg*> : commands to be executed when interface is brought up/down"
+    echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated, use speed & duplex)"
+    echo "   - modprobe <module> <arg*> : load this module with optional arguments"
+    echo "   - mtu <mtu> : set interface MTU"
+    echo "   - multicast {on|off} : enable/disable receiving of multicasts"
+    echo "   - replace <old_if_name> : use and rename interface old_if_name if not found"
+    echo "   - shutdown : disable this interface"
+    echo "   - slave <interface*> (implies type=bonding) : specify slave interfaces for bond/bridge"
+    echo "   - speed {10|100|1000|...} : set link speed"
+    echo "   - sysctl <var>=<val> : set network sysctl in root instance or net.ipv4.conf.\$if for interfaces"
+    echo "   - sysctl6 <var>=<val>: set net.ipv6.conf.\$if sysctl for interfaces"
+    echo "   - sysset <var>=<val>: set param in sys.class.net for root or sys.class.net.\$if for interfaces"
+    echo "   - type <bonding|bridge|tun|tap|wg> : specify interface type"
+    echo "   - usedhcphostname [0|1] : allow to set the host name from DHCP (def: 0)"
+    echo "   - vrrp instance <inst> [setting value]* : set VRRP setting for VRRP instance"
+    echo "   - vrrp [id|prio|address|no-address|auth_type|passwod|garp|v2|v3|...] [...]* : see service vrrp "
+    echo "   - wg fwmark <mark> : mark outgoing WG packets with this FW mark"
+    echo "   - wg listen_port <port> : make WG listen on this port"
+    echo "   - wg private_key <file> : the the WG private key from this file"
+    echo "   - wpa_group <group> : set the 'group' WPA parameter (dev: nond)"
+    echo "   - wpa_key_mgmt <key> : set the 'key_mgmt' WPA parameter (def: NONE)"
+    echo "   - wpa_proto <proto*> : set the 'proto' WPA parameter (def:WPA RSN)"
+    echo "   - wpa_psk <psk> : set the 'psk' WPA parameter (def: none)"
+    echo "   - wpa_ssid <ssid> : set the 'ssid' WPA parameter (non-empty enables WPA)"
     exit 1 
 }
 
