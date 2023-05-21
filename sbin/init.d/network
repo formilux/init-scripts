@@ -104,7 +104,7 @@ option	wpa_key_mgmt	standard_option
 option	wpa_proto	standard_option
 option	autoconf_script	standard_option	/usr/libexec/ipautoconfig
 
-SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx neigh6_idx route6_idx arp_idx ipautoconf"
+SVC_VARS="addr_list addr6_list route_list route6_list arp_list addr_idx addr6_idx route_idx rule_idx neigh6_idx route6_idx rule6_idx arp_idx ipautoconf"
 
 
 function do_help {
@@ -122,10 +122,12 @@ function do_help {
     echo "   - ip [[addr <address>] | dhcp | autoconfig] [<args>] : set IPv4 address and mask"
     echo "   - ip [dhcp | autoconfig] : manage IPv4 address using DHCP, or only once at boot (autoconfig)"
     echo "   - ip [route <dest> <-|gw>] [<args>] : set IPv4 routes"
+    echo "   - ip [rule] [<args>]* : add IPv4 policy rule"
     echo "   - ip [{arp|neigh} <ip> {<mac>|pub}] [<args>] : set IPv4 ARP entry"
     echo "   - ip6 [addr <address6>] [<args>] : set IPv6 address"
     echo "   - ip6 [neigh <addr6> {<mac>|proxy}] [<args>] : set IPv6 neighbor (IPv6 equiv to ARP)"
     echo "   - ip6 [route <dest6> <-|gw6>] [<args>] : set IPv6 routes"
+    echo "   - ip6 [rule] [<args>]* : add IPv6 policy rule"
     echo "   - lladdr <mac_addr> : set interface MAC address"
     echo "   - load|unload <command> <arg*> : commands to be executed when interface is brought up/down"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated, use speed & duplex)"
@@ -234,8 +236,10 @@ function fct_begin_section {
     addr6_idx=0
     arp_idx=0
     route_idx=0
+    rule_idx=0
     neigh6_idx=0
     route6_idx=0
+    rule6_idx=0
     bonding_idx=0
     ipautoconf=""
     wg_listen_port=
@@ -295,7 +299,7 @@ function option_wg {
     esac
 }
 
-# usage: ip <ip> {addr|route} ...
+# usage: ip <ip> {autoconfig|addr|arp|dhcp|neigh|route|rule} ...
 function option_ip {
     shift
     local cmd=$1
@@ -316,6 +320,10 @@ function option_ip {
 	    route_list[$route_idx]="$*"
 	    route_idx=$[$route_idx+1]
 	    ;;
+	rule)
+	    rule_list[$rule_idx]="$*"
+	    rule_idx=$[$rule_idx+1]
+	    ;;
 	dhcp)
 	    addr_list[$addr_idx]="dhcp"
 	    addr_idx=$[$addr_idx+1]
@@ -328,7 +336,7 @@ function option_ip {
     esac
 }
 
-# usage: ip6 <ipv6> {addr|route} ...
+# usage: ip6 <ipv6> {addr|neigh|route|rule} ...
 function option_ip6 {
     shift
     local cmd=$1
@@ -346,6 +354,10 @@ function option_ip6 {
             route6_list[$route6_idx]="$*"
             route6_idx=$[$route6_idx+1]
             ;;
+	rule)
+	    rule6_list[$rule6_idx]="$*"
+	    rule6_idx=$[$rule6_idx+1]
+	    ;;
         --disable)
             ;;
         *)
@@ -828,6 +840,13 @@ function do_start {
     done
 
     arg=0
+    while [ $arg -lt $rule_idx ]; do
+	local args=${rule_list[$arg]}
+	ip rule add ${instname:+iif $instname} ${args[*]}
+	arg=$[$arg+1]
+    done
+
+    arg=0
     while [ $arg -lt $route_idx ]; do
 	local dest gw
 	dest=${route_list[$arg]%%[ 	]*}
@@ -867,6 +886,13 @@ function do_start {
             ip -6 neigh add dev $instname $ip lladdr $mac $opts
         fi
         arg=$[$arg+1]
+    done
+
+    arg=0
+    while [ $arg -lt $rule6_idx ]; do
+	local args=${rule6_list[$arg]}
+	ip -6 rule add ${instname:+iif $instname} ${args[*]}
+	arg=$[$arg+1]
     done
 
     arg=0
@@ -995,6 +1021,20 @@ function do_stop {
 	else
 	    ip route del $dest ${instname:+dev $instname} ${gw#connected} >/dev/null 2>&1
 	fi
+	arg=$[$arg+1]
+    done
+
+    arg=0
+    while [ $arg -lt $rule6_idx ]; do
+	local args=${rule6_list[$arg]}
+	ip -6 rule delete ${instname:+iif $instname} ${args[*]} >/dev/null 2>&1
+	arg=$[$arg+1]
+    done
+
+    arg=0
+    while [ $arg -lt $rule_idx ]; do
+	local args=${rule_list[$arg]}
+	ip rule delete ${instname:+iif $instname} ${args[*]} >/dev/null 2>&1
 	arg=$[$arg+1]
     done
 
