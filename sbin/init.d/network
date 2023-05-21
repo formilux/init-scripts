@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# service network [<ifname>]       # interface name -> int_<ifname>=enable
+# service network [<ifname>]
 #     ip [[addr <address>] | dhcp | autoconfig] [<args>]
 #     ip [{arp|neigh} <ip> {<mac>|pub}] [<args>]
 #     ip [route <dest> <-|gw>] [<args>]
@@ -40,6 +40,12 @@
 #     usedhcphostname [0|1] (def: 0)
 #     dhcptimeout <timeout_sec> (def: 10)
 #     autoconf_script <path> (def: /usr/libexec/ipautoconfig)
+
+# Notes for IPv6 addressing: accept_ra defaults to 1 which means that an
+# address and a default route may be assigned by a local default gateway for
+# a given duration if forwarding=0 (default). Disable this by setting either
+# accept_ra=0, accept_ra_pinfo=0 or autoconf=0. Force it even when forwarding=1
+# by enabling all these and setting accept_ra=2.
 
 # we want ALL instances to stop and restart at once
 if [ "$1" = "restart" ]; then
