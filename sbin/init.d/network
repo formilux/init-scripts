@@ -972,6 +972,32 @@ function do_stop {
     fi
     rm -f "/var/run/wpa_supplicant-${instname}.conf"
 
+    arg=0
+    while [ $arg -lt $route6_idx ]; do
+	local dest gw
+	dest=${route6_list[$arg]%%[ 	]*}
+	gw=${route6_list[$arg]#*[ 	]}	# gw and potentially other ip args
+	if [ -n "${gw##connected*}" ]; then
+	    ip -6 route del $dest ${instname:+dev $instname} via $gw >/dev/null 2>&1
+	else
+	    ip -6 route del $dest ${instname:+dev $instname} ${gw#connected} >/dev/null 2>&1
+	fi
+	arg=$[$arg+1]
+    done
+
+    arg=0
+    while [ $arg -lt $route_idx ]; do
+	local dest gw
+	dest=${route_list[$arg]%%[ 	]*}
+	gw=${route_list[$arg]#*[ 	]}	# gw and potentially other ip args
+	if [ -n "${gw##connected*}" ]; then
+	    ip route del $dest ${instname:+dev $instname} via $gw >/dev/null 2>&1
+	else
+	    ip route del $dest ${instname:+dev $instname} ${gw#connected} >/dev/null 2>&1
+	fi
+	arg=$[$arg+1]
+    done
+
     ip link set $instname down >/dev/null 2>&1
     ip addr flush dev $instname >/dev/null 2>&1
 
