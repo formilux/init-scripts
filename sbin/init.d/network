@@ -410,6 +410,7 @@ function do_start {
     local arg
 
     if [ -z "$instname" ]; then
+        # here we have no instance, it's the generic section
 	echo "# Starting $svcname ..."
 	arg=0
 	while [ $arg -lt ${#opt_modprobe[*]} ]; do
@@ -456,6 +457,14 @@ function do_start {
 	    fi
 	    arg=$[$arg+1]
 	done
+
+        arg=0
+        while [ $arg -lt $rule_idx ]; do
+            local args=${rule_list[$arg]}
+            ip rule add ${args[*]}
+            arg=$[$arg+1]
+        done
+
 	arg=0
 	while [ $arg -lt $route_idx ]; do
 	    local dest gw
@@ -468,6 +477,14 @@ function do_start {
 	    fi
 	    arg=$[$arg+1]
 	done
+
+        arg=0
+        while [ $arg -lt $rule6_idx ]; do
+            local args=${rule6_list[$arg]}
+            ip -6 rule add ${args[*]}
+            arg=$[$arg+1]
+        done
+
         arg=0
         while [ $arg -lt $route6_idx ]; do
             local dest gw
@@ -483,6 +500,10 @@ function do_start {
 	echo "  ==> start $svcname : Done."
 	return $?
     fi
+
+    #
+    # below we necessarily have an instance
+    #
 
     if [ "$opt_shutdown" = 1 ]; then
 	return 0
@@ -842,7 +863,7 @@ function do_start {
     arg=0
     while [ $arg -lt $rule_idx ]; do
 	local args=${rule_list[$arg]}
-	ip rule add ${instname:+iif $instname} ${args[*]}
+	ip rule add iif $instname ${args[*]}
 	arg=$[$arg+1]
     done
 
@@ -891,7 +912,7 @@ function do_start {
     arg=0
     while [ $arg -lt $rule6_idx ]; do
 	local args=${rule6_list[$arg]}
-	ip -6 rule add ${instname:+iif $instname} ${args[*]}
+	ip -6 rule add iif $instname ${args[*]}
 	arg=$[$arg+1]
     done
 
