@@ -17,6 +17,7 @@
 #     ip6 [addr <address6>] [<args>] : set IPv6 address"
 #     ip6 [neigh <addr6> {<mac>|proxy}] [<args>] : set IPv6 neighbor (IPv6 equiv to ARP)"
 #     ip6 [route <dest6> <-|gw6>] [<args>] : set IPv6 routes"
+#     led <led_name> [<evt>]: show link status on this led (optionally with event type)"
 #     lladdr <mac_addr> : set interface MAC address"
 #     load|unload <command> <arg*> : commands to be executed when interface is brought up/down"
 #     media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated, use speed & duplex)"
@@ -88,6 +89,7 @@ option	sysctl		multiple_option
 option	sysctl6		multiple_option
 option	sysset          multiple_option
 option	modprobe 	multiple_option
+option	led		option_led
 option	lladdr		standard_option
 option	mtu		standard_option
 option	arp		boolean_option	1
@@ -128,6 +130,7 @@ function do_help {
     echo "   - ip6 [neigh <addr6> {<mac>|proxy}] [<args>] : set IPv6 neighbor (IPv6 equiv to ARP)"
     echo "   - ip6 [route <dest6> <-|gw6>] [<args>] : set IPv6 routes"
     echo "   - ip6 [rule] [<args>]* : add IPv6 policy rule"
+    echo "   - led <led_name> [<evt>]: use this LED for link status (optionally with event type)"
     echo "   - lladdr <mac_addr> : set interface MAC address"
     echo "   - load|unload <command> <arg*> : commands to be executed when interface is brought up/down"
     echo "   - media auto|{full|fdx|100full|100fdx}|{half|hdx|100half|100hdx} (deprecated, use speed & duplex)"
@@ -222,6 +225,28 @@ function set_fctl {
 	    /sbin/ethtool -A $1 autoneg on rx on tx on >/dev/null 2>&1
 	    ;;
     esac
+}
+
+# Enables a led trigger for a network interface if available.
+# Takes the interface name on $1, the LED name in $2, and optional event in $3
+# (defaults to "link"). Silently ignores non-existing interfaces, missing leds
+# and missing arguments.
+function set_leds {
+    local intf="$1"
+    local led="$2"
+    local evt="${3:-link}"
+    local phy
+
+    [ -n "$intf" -a -n "$led" ] || return 0
+    [ -e "/sys/class/leds/$led/trigger" ] || return 0
+    [ -e "/sys/class/net/$intf/phydev" ] || return 0
+
+    # return the phy in form name-addr
+    phy=$(readlink -s "/sys/class/net/$intf/phydev" 2>/dev/null)
+    [ -n "$phy" ] || return 0
+    phy="${phy##*/}"
+    ( echo "$phy:$evt" > "/sys/class/leds/$led/trigger" ) 2>/dev/null
+    return 0
 }
 
 function fct_begin_section {
@@ -364,6 +389,13 @@ function option_ip6 {
             echo "Unknown ip command : $cmd $*"
             return 1
     esac
+}
+
+# parse "led <name> [<event>]"
+function option_led {
+    shift
+    opt_led="$1"
+    opt_led_evt="$2"
 }
 
 # used with config.rc param: cpumask <mask>
@@ -571,6 +603,7 @@ function do_start {
                            $0 start $arg ) >/dev/null 2>&1; then
                         echo "  ==> FAILED! need to start iface $arg before $instname"
                     else
+                        ( set -- $(config get "network.$arg" led); set_leds "$arg" "$2" "$3" ) 2>/dev/null
                         if ! ip link set dev $arg master $instname; then
                             echo "  ==> Failed to add slave $arg to bridge $instname"
                         fi
@@ -725,6 +758,9 @@ function do_start {
 	return 1
     elif [ "$instname" = "lo" ] ; then
        ip addr del dev $instname 127.0.0.1/8 >/dev/null 2>&1
+    else
+       # regular interface turned up. If a LED is specified, try to activate it
+       set_leds "$instname" "$opt_led" "$opt_led_evt"
     fi
 
     if [ -n "$cpumask" ] ; then
@@ -766,6 +802,9 @@ function do_start {
                 ifenslave $instname $arg >/dev/null 2>&1
                 ip addr flush dev $arg >/dev/null 2>&1
             fi
+            # the enslaving turns the slave interface up again, we may need to
+            # set the LED indicator again.
+            ( set -- $(config get "network.$arg" led); set_leds "$arg" "$2" "$3" ) 2>/dev/null
         done
 
         if [ -e "/sys/class/net/$instname/bonding" ] ; then
