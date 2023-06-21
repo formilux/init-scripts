@@ -760,7 +760,8 @@ function do_start {
             elif [ -e "/sys/class/net/$instname/bonding/slaves" ]; then
                 ip li set dev "$arg" down >/dev/null 2>&1
                 ip addr flush dev "$arg" >/dev/null 2>&1
-                echo "+$instname" > /sys/class/net/bonding_masters
+                # will automatically set the device up again
+                echo "+$arg" > "/sys/class/net/$instname/bonding/slaves"
             else
                 ifenslave $instname $arg >/dev/null 2>&1
                 ip addr flush dev $arg >/dev/null 2>&1
