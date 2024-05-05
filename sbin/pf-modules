@@ -76,4 +76,6 @@ if [ -n "$DO_LIST_MOD" ]; then
 fi
 
 # and load all available modules
-exec modprobe -a "${modules[@]}"
+if [ "${#modules[@]}" -gt 0 ]; then
+    exec modprobe -a "${modules[@]}"
+fi
