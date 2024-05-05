@@ -16,6 +16,7 @@ option	rtc		standard_option	"local"		# "local", "utc", "disabled"
 option	rtc_mode	standard_option	"direct"	# "direct", "kernel"
 option	nv_auto_mount	boolean_option
 option	nv_auto_format	boolean_option
+option  vt_consoles     standard_option                 # 0..63 or leave empty for auto
 
 
 function do_help {
@@ -31,6 +32,7 @@ function do_help {
     echo "   - rtc_mode : direct|kernel      ;  direct ; cur=$opt_rtc_mode"
     echo "   - nv_auto_mount  : boolean ; default=     ; cur=$opt_nv_auto_mount"
     echo "   - nv_auto_format : boolean ; default=     ; cur=$opt_nv_auto_format"
+    echo "   - vt_consoles : integer ; default=        ; cur=$opt_vt_consoles"
     echo
     exit 1 
 }
@@ -66,6 +68,127 @@ function do_date_from_hw {
     "${SHELL:-sh}" -c '[ /proc/self/. -ot /usr/share/factory/version ] && date -s "$(date -r /usr/share/factory/version)" >/dev/null'
 
     return 0
+}
+
+# updates inittab with consoles and optionally reload init.
+# Since /dev/console may not be assigned a process group owner, we need to find
+# which real consoles it corresponds to. If we can't, we'll leave /dev/console
+# however since it still works well enough for most use cases.
+function update_consoles {
+    local consoles=( )
+    local ser_consoles=( )
+    local line num name path dev
+    local touched=0
+    local use_vt=0
+
+    if [ -e /proc/consoles ]; then
+        # series of: "ttyS0                -W- (EC   a)    4:64"
+        while read; do
+            set -- $REPLY
+            name="$1"
+            flags="${REPLY##*(}"; flags="${flags%%)*}"
+            dev="${!#}"
+            if [ -n "$name" -a -n "$flags" -a -z "${flags##*E*}" ]; then
+                consoles[${#consoles[@]}]="$name $dev"
+            fi
+        done < /proc/consoles
+    else
+        # if we can't check /proc/consoles, in doubt, enable VTs
+        use_vt=1
+    fi
+
+    # consoles[@] is of the form "name [major:minor]" for each line
+    for line in "${consoles[@]}"; do
+        set -- $line
+        name="$1"
+        dev="${!#}"
+        if [ -z "${name##tty[0-9]*}" ]; then
+            # A virtual console is enabled. If opt_vt_console was not
+            # configured, we set it to 4.
+            use_vt=1
+            [ -n "${opt_vt_consoles}" ] || opt_vt_consoles=4
+        else
+            # OK that's a serial (or other) console. The name might be
+            # incorrect though that's rare these days. The device number
+            # however, is correct. If /sys/dev/char is available, we'll
+            # double-check there.
+            if [ -n "$dev" -a -d "/sys/dev/char/$dev/." ]; then
+                path=$(readlink "/sys/dev/char/$dev")
+                path="${path##*tty/}"
+                [ -z "$path" ] || name="$path"
+            fi
+
+            path="/dev/${name}"
+            if [ ! -e "${path}" ]; then
+                mkdir -p "${path%/*}"
+                mknod c "${path}" "${dev%:*}" "${dev#*:}"
+                chown root:tty "${path}"
+                chmod 620 "${path}"
+            fi
+
+            ser_consoles=( "${ser_consoles[@]}" "$name" )
+        fi
+    done
+
+    # Create virtual consoles if needed. We'll create the configured number
+    # of virtual consoles (possibly none) after removing the possibly
+    # existing ones from the file (which can even result in no vt if set to
+    # zero). Note that tty0 is not a real console, it is the one that
+    # remaps to the currently active one and it must not be used by agetty!
+    # If nothing indicates VT should be used, we don't even remove possibly
+    # existing ones.
+    if [ ${use_vt} -ne 0 ] && [ -n "${opt_vt_consoles}" ] && [ "${opt_vt_consoles}" -ge 0 ]; then
+        [ "${opt_vt_consoles}" -lt 64 ] || opt_vt_consoles=63
+        sed -i -e '/^[^:]*:[^:]*:[^:]*:\([^/]*\/\)*agetty.*\btty[0-9]\+\b/d' /etc/inittab
+        num=1
+        while [ ${num} -le ${opt_vt_consoles} ]; do
+            name="tty${num}"
+            path="/dev/${name}"
+            if [ ! -e "${path}" ]; then
+                mkdir -p "${path%/*}"
+                mknod c "${path}" 4 ${num}
+                chown root:tty "${path}"
+                chmod 620 "${path}"
+            fi
+            echo "c${num}:1245:respawn:/sbin/agetty 38400 tty$num linux" >> /etc/inittab
+            ((num++))
+            touched=1
+        done
+    fi
+
+    # Then we'll add all remaining consoles that were passed by the boot
+    # loader. Since they may collide with already configured ones and we have 4
+    # chars for the IDs, we'll name them from s100 to s999.
+    num=0
+    for name in "${ser_consoles[@]}"; do
+        sed -i -e "/^[^:]*:[^:]*:[^:]*:\([^/]*\/\)*agetty.*\b${name##*/}\b/d" /etc/inittab
+        # missing entries in /dev for existing devices will not magically
+        # appear under us so we must create them. Other ones are not a
+        # problem because they might be created later when loading a
+        # module or connecting a device (e.g. ttyUSB*).
+        if [ ! -e "/dev/${name}" -a -e "/sys/class/tty/${name}/dev" ]; then
+            dev=$(cat "/sys/class/tty/${name}/dev")
+            path="/dev/${name}"
+            mkdir -p "${path%/*}"
+            mknod c "${path}" "${dev%:*}" "${dev#*:}"
+            chown root:tty "${path}"
+            chmod 620 "${path}"
+        fi
+        # all console devices keep their original speed.
+        echo "s$((100+num)):1245:respawn:/sbin/agetty -L -s $name linux" >> /etc/inittab
+        ((num++))
+        touched=1
+    done
+
+    if [ $touched != 0 ]; then
+        # suppress an eventual /dev/console entry in inittab
+        sed -i -e '/^[^:]*:[^:]*:[^:]*:\([^/]*\/\)*agetty.*\bconsole\b/d' /etc/inittab
+        kill -1 1
+    elif ! grep -qw "agetty.*\b\(console\|tty\|ttyS\|ttyATH\|ttyAMA\|ttyFIQ\)[0-9]*\b" /etc/inittab; then
+        # no console found at all, try to add at least /dev/console
+        echo "c0:1245:respawn:/sbin/agetty -L -s console linux" >> /etc/inittab
+        kill -1 1
+    fi
 }
 
 # saves current date to hardware clock
@@ -152,6 +275,8 @@ function do_start {
         fi
     done
 
+    update_consoles
+
     return 0
 }
 
@@ -231,4 +356,3 @@ function fct_post_checkconf {
 }
 
 load_config
-
