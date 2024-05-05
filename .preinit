@@ -125,5 +125,8 @@ te INITSHELL=1
 ex /sbin/restore-etc
 |ec "Could not find flash file system with a valid configuration."
 
+# feed random from /proc, /sys, /etc
+rf /proc /proc/sys/kernel/random/boot_id /proc/self/maps /proc/net/dev /sys/firmware/devicetree/base /sys/firmware/acpi/tables /usr/share/factory/version /etc
+
 in /sbin/init-sysv
 
