@@ -17,6 +17,7 @@ option	rtc_mode	standard_option	"direct"	# "direct", "kernel"
 option	nv_auto_mount	boolean_option
 option	nv_auto_format	boolean_option
 option  vt_consoles     standard_option                 # 0..63 or leave empty for auto
+option	extra_consoles	multiple_option                 # ttyS0:9600:vt100 tty0 ttyUSB1
 
 
 function do_help {
@@ -33,6 +34,7 @@ function do_help {
     echo "   - nv_auto_mount  : boolean ; default=     ; cur=$opt_nv_auto_mount"
     echo "   - nv_auto_format : boolean ; default=     ; cur=$opt_nv_auto_format"
     echo "   - vt_consoles : integer ; default=        ; cur=$opt_vt_consoles"
+    echo "   - extra_consoles : names ; eg: ttyS0:9600 ; cur=${opt_extra_consoles[@]}"
     echo
     exit 1 
 }
@@ -77,7 +79,7 @@ function do_date_from_hw {
 function update_consoles {
     local consoles=( )
     local ser_consoles=( )
-    local line num name path dev
+    local line num name path dev spd term
     local touched=0
     local use_vt=0
 
@@ -97,8 +99,9 @@ function update_consoles {
         use_vt=1
     fi
 
-    # consoles[@] is of the form "name [major:minor]" for each line
-    for line in "${consoles[@]}"; do
+    # consoles[@] is of the form "name[:spd[:term]] [major:minor]" for each line
+    # Note that we may have multiple entries in one extra_console line.
+    for line in "${consoles[@]}" ${opt_extra_consoles[*]}; do
         set -- $line
         name="$1"
         dev="${!#}"
@@ -118,7 +121,7 @@ function update_consoles {
                 [ -z "$path" ] || name="$path"
             fi
 
-            path="/dev/${name}"
+            path="/dev/${name%%:*}"
             if [ ! -e "${path}" ]; then
                 mkdir -p "${path%/*}"
                 mknod c "${path}" "${dev%:*}" "${dev#*:}"
@@ -158,9 +161,15 @@ function update_consoles {
 
     # Then we'll add all remaining consoles that were passed by the boot
     # loader. Since they may collide with already configured ones and we have 4
-    # chars for the IDs, we'll name them from s100 to s999.
+    # chars for the IDs, we'll name them from s100 to s999. Serial terms may
+    # optionally have a baud rate after a first colon, and a term type after
+    # the second colon.
     num=0
     for name in "${ser_consoles[@]}"; do
+        name="${name}:"
+        spd="${name#*:}"; name="${name%%:*}"
+        term="${spd#*:}"; spd="${spd%%:*}"
+        term="${term%%:*}"
         sed -i -e "/^[^:]*:[^:]*:[^:]*:\([^/]*\/\)*agetty.*\b${name##*/}\b/d" /etc/inittab
         # missing entries in /dev for existing devices will not magically
         # appear under us so we must create them. Other ones are not a
@@ -174,8 +183,9 @@ function update_consoles {
             chown root:tty "${path}"
             chmod 620 "${path}"
         fi
-        # all console devices keep their original speed.
-        echo "s$((100+num)):1245:respawn:/sbin/agetty -L -s $name linux" >> /etc/inittab
+        # all console devices keep their original speed if not set, and have
+        # the term type "linux" by default.
+        echo "s$((100+num)):1245:respawn:/sbin/agetty -L ${spd:--s} $name ${term:-linux}" >> /etc/inittab
         ((num++))
         touched=1
     done
