@@ -1,8 +1,8 @@
 #!/bin/bash
 cfgfile=${1:-/etc/config.rc}
-/sbin/init.d/functions -f "$cfgfile" --list_sections --auto | (last=; while read svc rest; do
+${cfgfile%/*}/init.d/functions -f "$cfgfile" --list_sections --auto | (last=; while read svc rest; do
   if [ "$svc" != "$last" ]; then
-    /sbin/init.d/$svc -f "$cfgfile" --auto start </dev/null
+    ${cfgfile%/*}/init.d/$svc -f "$cfgfile" --auto start </dev/null
   fi
   last=$svc
 done)
