@@ -129,14 +129,14 @@ function update_consoles {
                 chmod 620 "${path}"
             fi
 
-            # get the boot baud rate if none was set, or default to 115200
+            # get the boot baud rate if none was set, or default to keeping baud rate
             if [ -n "${name##*:*}" ]; then
                 # try to get baud rate at boot
                 baud=$(stty < "$path" 2>/dev/null | grep -o 'speed [0-9]*' | cut -f2 -d' ')
                 if [ -n "$baud" ]; then
                     name=${name}:$baud
                 else
-                    name=${name}:115200
+                    name=${name}:
                 fi
             fi
 
