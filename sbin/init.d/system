@@ -154,10 +154,12 @@ function update_consoles {
     if [ ${use_vt} -ne 0 ] && [ -n "${opt_vt_consoles}" ] && [ "${opt_vt_consoles}" -ge 0 ]; then
         [ "${opt_vt_consoles}" -lt 64 ] || opt_vt_consoles=63
         sed -i -e '/^[^:]*:[^:]*:[^:]*:\([^/]*\/\)*agetty.*\btty[0-9]\+\b/d' /etc/inittab
+        echo -n "Adding virtual consoles..."
         num=1
         while [ ${num} -le ${opt_vt_consoles} ]; do
             name="tty${num}"
             path="/dev/${name}"
+            echo -n " <$name>"
             if [ ! -e "${path}" ]; then
                 mkdir -p "${path%/*}"
                 mknod c "${path}" 4 ${num}
@@ -168,6 +170,7 @@ function update_consoles {
             ((num++))
             touched=1
         done
+        echo
     fi
 
     # Then we'll add all remaining consoles that were passed by the boot
@@ -176,11 +179,15 @@ function update_consoles {
     # optionally have a baud rate after a first colon, and a term type after
     # the second colon.
     num=0
+    if [ -n "${ser_consoles[*]}" ]; then
+        echo -n "Adding serial consoles..."
+    fi
     for name in "${ser_consoles[@]}"; do
         name="${name}:"
         spd="${name#*:}"; name="${name%%:*}"
         term="${spd#*:}"; spd="${spd%%:*}"
         term="${term%%:*}"
+        echo -n " <$name:$spd:$term>"
         sed -i -e "/^[^:]*:[^:]*:[^:]*:\([^/]*\/\)*agetty.*\b${name##*/}\b/d" /etc/inittab
         # missing entries in /dev for existing devices will not magically
         # appear under us so we must create them. Other ones are not a
@@ -200,6 +207,9 @@ function update_consoles {
         ((num++))
         touched=1
     done
+    if [ -n "${ser_consoles[*]}" ]; then
+        echo
+    fi
 
     if [ $touched != 0 ]; then
         # suppress an eventual /dev/console entry in inittab
